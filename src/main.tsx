@@ -325,7 +325,7 @@ type SortMode = 'none' | 'pap-asc' | 'pap-desc'
 const ALL_APPS = '__all__'
 // Excel versionado en el repo (carpeta public/). Para actualizar los datos que
 // ve todo el mundo, reemplaza este archivo y vuelve a desplegar.
-const DEFAULT_FILE = 'matriz.xlsx'
+const DEFAULT_FILE = 'matriz_backlog.xlsx'
 
 function App() {
   const [projects, setProjects] = useState<Project[]>(sampleProjects())
