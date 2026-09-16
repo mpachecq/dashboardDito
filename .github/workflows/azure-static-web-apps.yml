@@ -31,6 +31,9 @@ jobs:
           app_location: "/"        # código fuente
           api_location: ""          # sin API/functions
           output_location: "dist"  # carpeta que genera 'npm run build'
+          # Si aún no existe el token de Azure (la Static Web App no está creada),
+          # el workflow no falla: simplemente omite el despliegue.
+          skip_deploy_on_missing_secrets: true
 
   close_pull_request:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
