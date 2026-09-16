@@ -24,9 +24,19 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#1838
 .error{background:#fff0f0;border:1px solid #f4b5b5;color:#a51d1d;padding:10px 13px;border-radius:7px;margin-bottom:12px}
 
 .stats{display:grid;grid-template-columns:repeat(6,1fr);border:1px solid #c8d5e7;border-radius:17px;overflow:hidden;margin-bottom:24px}
-.stat{display:flex;align-items:center;gap:15px;padding:16px 20px;border-right:1px solid #d9e1ec}
+/* Cada tarjeta es un botón-filtro por estado. */
+.stat{display:flex;align-items:center;gap:15px;padding:16px 20px;border:0;border-right:1px solid #d9e1ec;background:#fff;font:inherit;text-align:left;cursor:pointer;position:relative;transition:background .12s}
 .stat:last-child{border-right:0}
-.stat i{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-style:normal;background:#173b78;color:#fff;font-weight:800;font-size:20px}
+.stat:hover{background:#f3f7fc}
+.stat.active{background:#eef4fc}
+/* Barra superior de color que marca la tarjeta activa. */
+.stat.active:before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:#173b78}
+.stat.active.stat-produccion:before{background:#4ca942}
+.stat.active.stat-testing:before{background:#1d6fc1}
+.stat.active.stat-desarrollo:before{background:#f5a900}
+.stat.active.stat-planificado:before{background:#8a93a3}
+.stat.active.stat-cancelado:before{background:#eb252c}
+.stat i{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-style:normal;background:#173b78;color:#fff;font-weight:800;font-size:20px;flex:none}
 .stat b{display:block;font-size:25px;color:#18386e}
 .stat span{font-size:12px;color:#294b80}
 .stat:nth-child(2) i{background:#4ca942}

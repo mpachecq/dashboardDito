@@ -322,7 +322,18 @@ function timelinePosition(date: Date): number {
 }
 
 type SortMode = 'none' | 'pap-asc' | 'pap-desc'
+// Grupos de estado usados por las tarjetas-filtro (coinciden con los conteos).
+type StatusGroup = 'produccion' | 'testing' | 'desarrollo' | 'planificado' | 'cancelado'
+type StatusFilter = StatusGroup | 'all'
 const ALL_APPS = '__all__'
+
+// Devuelve el grupo de estado al que pertenece un proyecto (planificado agrupa
+// planificado/refinamiento/definición, igual que las tarjetas de estadísticas).
+function statusGroup(status: Status): StatusGroup | 'otros' {
+  if (status === 'produccion' || status === 'testing' || status === 'desarrollo' || status === 'cancelado') return status
+  if (status === 'planificado' || status === 'refinamiento' || status === 'definicion') return 'planificado'
+  return 'otros'
+}
 // Excel versionado en el repo (carpeta public/). Para actualizar los datos que
 // ve todo el mundo, reemplaza este archivo y vuelve a desplegar.
 const DEFAULT_FILE = 'matriz_backlog.xlsx'
@@ -332,6 +343,7 @@ function App() {
   const [fileName, setFileName] = useState('Ejemplo')
   const [error, setError] = useState('')
   const [appFilter, setAppFilter] = useState<string>(ALL_APPS)
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [sortMode, setSortMode] = useState<SortMode>('none')
   const [monthWidth, setMonthWidth] = useState(200) // px por mes (zoom del timeline)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -346,9 +358,15 @@ function App() {
     [projects]
   )
 
-  // Proyectos visibles tras aplicar filtro por aplicación y orden por PaP.
+  // Proyectos filtrados solo por aplicación (base para las tarjetas de estado).
+  const byApp = useMemo(
+    () => appFilter === ALL_APPS ? projects : projects.filter(p => p.application === appFilter),
+    [projects, appFilter]
+  )
+
+  // Proyectos visibles: filtro de aplicación + filtro de estado + orden por PaP.
   const visibleProjects = useMemo(() => {
-    let list = appFilter === ALL_APPS ? projects : projects.filter(p => p.application === appFilter)
+    let list = statusFilter === 'all' ? byApp : byApp.filter(p => statusGroup(p.status) === statusFilter)
     if (sortMode !== 'none') {
       const dir = sortMode === 'pap-asc' ? 1 : -1
       list = [...list].sort((a, b) => {
@@ -360,23 +378,31 @@ function App() {
       })
     }
     return list
-  }, [projects, appFilter, sortMode])
+  }, [byApp, statusFilter, sortMode])
 
-  const isDirty = appFilter !== ALL_APPS || sortMode !== 'none' || monthWidth !== 200
+  const isDirty = appFilter !== ALL_APPS || statusFilter !== 'all' || sortMode !== 'none' || monthWidth !== 200
   function resetView() {
     setAppFilter(ALL_APPS)
+    setStatusFilter('all')
     setSortMode('none')
     setMonthWidth(200)
   }
 
+  // Alterna el filtro de estado: click en la tarjeta activa/desactiva el filtro.
+  function toggleStatus(group: StatusFilter) {
+    setStatusFilter(prev => prev === group ? 'all' : group)
+  }
+
+  // Conteos por estado calculados sobre la lista filtrada por aplicación (sin el
+  // filtro de estado), para que las tarjetas siempre muestren los totales reales.
   const stats = useMemo(() => ({
-    total: visibleProjects.length,
-    produccion: visibleProjects.filter(p => p.status === 'produccion').length,
-    testing: visibleProjects.filter(p => p.status === 'testing').length,
-    desarrollo: visibleProjects.filter(p => p.status === 'desarrollo').length,
-    planificado: visibleProjects.filter(p => p.status === 'planificado' || p.status === 'refinamiento' || p.status === 'definicion').length,
-    cancelado: visibleProjects.filter(p => p.status === 'cancelado').length
-  }), [visibleProjects])
+    total: byApp.length,
+    produccion: byApp.filter(p => p.status === 'produccion').length,
+    testing: byApp.filter(p => p.status === 'testing').length,
+    desarrollo: byApp.filter(p => p.status === 'desarrollo').length,
+    planificado: byApp.filter(p => statusGroup(p.status) === 'planificado').length,
+    cancelado: byApp.filter(p => p.status === 'cancelado').length
+  }), [byApp])
 
   async function handleFile(file: File) {
     setError('')
@@ -465,12 +491,12 @@ function App() {
       {error && <div className="error">{error}</div>}
 
       <section className="stats">
-        <Stat value={stats.total} label="Proyectos totales" icon="▥" />
-        <Stat value={stats.produccion} label="Producción" icon="✓" />
-        <Stat value={stats.testing} label="Testing" icon="⚑" />
-        <Stat value={stats.desarrollo} label="Desarrollo" icon="▣" />
-        <Stat value={stats.planificado} label="Planificado / Backlog" icon="◷" />
-        <Stat value={stats.cancelado} label="Cancelado" icon="×" />
+        <Stat value={stats.total} label="Proyectos totales" icon="▥" active={statusFilter === 'all'} onClick={() => setStatusFilter('all')} />
+        <Stat value={stats.produccion} label="Producción" icon="✓" status="produccion" active={statusFilter === 'produccion'} onClick={() => toggleStatus('produccion')} />
+        <Stat value={stats.testing} label="Testing" icon="⚑" status="testing" active={statusFilter === 'testing'} onClick={() => toggleStatus('testing')} />
+        <Stat value={stats.desarrollo} label="Desarrollo" icon="▣" status="desarrollo" active={statusFilter === 'desarrollo'} onClick={() => toggleStatus('desarrollo')} />
+        <Stat value={stats.planificado} label="Planificado / Backlog" icon="◷" status="planificado" active={statusFilter === 'planificado'} onClick={() => toggleStatus('planificado')} />
+        <Stat value={stats.cancelado} label="Cancelado" icon="×" status="cancelado" active={statusFilter === 'cancelado'} onClick={() => toggleStatus('cancelado')} />
       </section>
 
       <main className="roadmap-card" style={{ '--month-w': `${monthWidth}px` } as React.CSSProperties}>
@@ -483,7 +509,7 @@ function App() {
 
             {visibleProjects.length
               ? visibleProjects.map(p => <RoadmapRow key={p.key} p={p} statusIcon={statusIcon[p.status]} />)
-              : <div className="empty">No hay proyectos para esta aplicación.</div>}
+              : <div className="empty">No hay proyectos que coincidan con los filtros.</div>}
 
             <div className="legend">
               <strong>ETAPAS</strong>
@@ -506,8 +532,22 @@ function App() {
   )
 }
 
-function Stat({ value, label, icon }: { value:number, label:string, icon:string }) {
-  return <div className="stat"><i>{icon}</i><div><b>{value}</b><span>{label}</span></div></div>
+function Stat({ value, label, icon, status, active, onClick }: {
+  value: number, label: string, icon: string,
+  status?: StatusGroup, active?: boolean, onClick?: () => void
+}) {
+  return (
+    <button
+      type="button"
+      className={`stat${status ? ` stat-${status}` : ''}${active ? ' active' : ''}`}
+      onClick={onClick}
+      aria-pressed={active}
+      title={status ? `Filtrar por ${label}` : 'Mostrar todos'}
+    >
+      <i>{icon}</i>
+      <div><b>{value}</b><span>{label}</span></div>
+    </button>
+  )
 }
 
 // Abreviatura corta de etapa para la etiqueta del segmento.
