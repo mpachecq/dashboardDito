@@ -12,6 +12,11 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#1838
 .control{display:flex;flex-direction:column;gap:3px;font-size:11px;color:#6c7890;font-weight:700}
 .control select{font-size:13px;font-weight:400;color:#18386e;padding:7px 10px;border:1px solid #cdd8e8;border-radius:7px;background:#fff;cursor:pointer;min-width:170px}
 .control select:focus{outline:none;border-color:#173b78}
+.search-input{position:relative;display:flex;align-items:center}
+.search-input input{font-size:13px;font-weight:400;color:#18386e;padding:7px 28px 7px 10px;border:1px solid #cdd8e8;border-radius:7px;background:#fff;min-width:210px}
+.search-input input:focus{outline:none;border-color:#173b78}
+.search-input .clear{position:absolute;right:6px;width:18px;height:18px;border:0;border-radius:50%;background:#e1e7ef;color:#50627c;font-size:13px;line-height:1;cursor:pointer;display:grid;place-items:center;padding:0}
+.search-input .clear:hover{background:#cfd8e6}
 .zoom-buttons{display:flex;gap:6px}
 .zoom-buttons button{width:34px;height:34px;border:1px solid #cdd8e8;background:#fff;color:#173b78;font-size:18px;font-weight:700;border-radius:7px;cursor:pointer;line-height:1}
 .zoom-buttons button:hover:not(:disabled){background:#f3f6fa}
@@ -57,7 +62,12 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#1838
 /* El scroll horizontal vive solo en la tabla, no en toda la página. */
 .roadmap-scroll{overflow-x:auto;overflow-y:hidden}
 /* Ancho total = laterales + timeline, para alinear encabezado y filas al scroll. */
-.roadmap-inner{width:calc(var(--left1) + var(--left2) + var(--timeline-w) + var(--r1) + var(--r2) + var(--r3) + var(--r4))}
+.roadmap-inner{position:relative;width:calc(var(--left1) + var(--left2) + var(--timeline-w) + var(--r1) + var(--r2) + var(--r3) + var(--r4))}
+
+/* Línea vertical de "hoy": sutil pero visible, cruza todas las filas del
+   timeline desde debajo del encabezado (59px) hasta el borde de la leyenda. */
+.today-line{position:absolute;top:59px;bottom:0;width:0;border-left:2px dashed rgba(232,102,58,.4);z-index:4;pointer-events:none}
+.today-line .today-label{position:absolute;top:2px;left:50%;transform:translateX(-50%);background:#e8663a;color:#fff;font-size:9px;font-weight:700;letter-spacing:.3px;padding:1px 6px;border-radius:0 0 6px 6px;white-space:nowrap}
 .grid{display:grid;grid-template-columns:var(--left1) var(--left2) var(--timeline-w) var(--r1) var(--r2) var(--r3) var(--r4)}
 .grid>div:last-child{border-right:0}
 .header-row{background:#123675;color:white;font-weight:700;font-size:13px;min-height:59px}
@@ -127,7 +137,7 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#1838
 .status.cancelado i{background:#ed2224}
 .status.sin-estado i{background:#c1c7d1}
 
-.legend{display:flex;align-items:center;flex-wrap:wrap;gap:18px;padding:12px 22px;background:#f9fafc;border-top:1px solid #dbe2ec;font-size:12px}
+.legend{position:relative;z-index:5;display:flex;align-items:center;flex-wrap:wrap;gap:18px;padding:12px 22px;background:#f9fafc;border-top:1px solid #dbe2ec;font-size:12px}
 .legend strong{font-size:13px;margin-right:6px;color:#42557a}
 .legend-item{display:flex;align-items:center;gap:7px}
 .legend-sep{width:1px;height:20px;background:#d3dbe7;margin:0 4px}

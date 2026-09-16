@@ -344,6 +344,7 @@ function App() {
   const [error, setError] = useState('')
   const [appFilter, setAppFilter] = useState<string>(ALL_APPS)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [query, setQuery] = useState('') // búsqueda por código/nombre de proyecto
   const [sortMode, setSortMode] = useState<SortMode>('none')
   const [monthWidth, setMonthWidth] = useState(200) // px por mes (zoom del timeline)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -358,11 +359,16 @@ function App() {
     [projects]
   )
 
-  // Proyectos filtrados solo por aplicación (base para las tarjetas de estado).
-  const byApp = useMemo(
-    () => appFilter === ALL_APPS ? projects : projects.filter(p => p.application === appFilter),
-    [projects, appFilter]
-  )
+  // Proyectos filtrados por aplicación y búsqueda de proyecto (código o nombre).
+  // Es la base para las tarjetas de estado, así que sus conteos reflejan la búsqueda.
+  const byApp = useMemo(() => {
+    const q = normalize(query.trim())
+    return projects.filter(p => {
+      if (appFilter !== ALL_APPS && p.application !== appFilter) return false
+      if (q && !normalize(`${p.id} ${p.name}`).includes(q)) return false
+      return true
+    })
+  }, [projects, appFilter, query])
 
   // Proyectos visibles: filtro de aplicación + filtro de estado + orden por PaP.
   const visibleProjects = useMemo(() => {
@@ -380,10 +386,11 @@ function App() {
     return list
   }, [byApp, statusFilter, sortMode])
 
-  const isDirty = appFilter !== ALL_APPS || statusFilter !== 'all' || sortMode !== 'none' || monthWidth !== 200
+  const isDirty = appFilter !== ALL_APPS || statusFilter !== 'all' || query.trim() !== '' || sortMode !== 'none' || monthWidth !== 200
   function resetView() {
     setAppFilter(ALL_APPS)
     setStatusFilter('all')
+    setQuery('')
     setSortMode('none')
     setMonthWidth(200)
   }
@@ -392,6 +399,13 @@ function App() {
   function toggleStatus(group: StatusFilter) {
     setStatusFilter(prev => prev === group ? 'all' : group)
   }
+
+  // Posición de la fecha de hoy dentro del timeline (0..1). Solo se muestra la
+  // línea "hoy" si la fecha actual cae dentro del rango visible (Jun–Dic 2026).
+  const today = new Date()
+  const todayRaw = (today.getFullYear() - CURRENT_YEAR) * 12 + (today.getMonth() - FIRST_MONTH) + (today.getDate() - 1) / 31
+  const todayInRange = todayRaw >= 0 && todayRaw <= MONTH_COUNT
+  const todayPct = (todayRaw / MONTH_COUNT) * 100
 
   // Conteos por estado calculados sobre la lista filtrada por aplicación (sin el
   // filtro de estado), para que las tarjetas siempre muestren los totales reales.
@@ -458,6 +472,19 @@ function App() {
       <section className="toolbar">
         <div className="file-pill">Datos: <strong>{fileName}</strong></div>
 
+        <label className="control search">
+          <span>Buscar proyecto</span>
+          <div className="search-input">
+            <input
+              type="text"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Código o nombre…"
+            />
+            {query && <button type="button" className="clear" onClick={() => setQuery('')} aria-label="Limpiar búsqueda">×</button>}
+          </div>
+        </label>
+
         <label className="control">
           <span>Aplicación</span>
           <select value={appFilter} onChange={e => setAppFilter(e.target.value)}>
@@ -506,6 +533,16 @@ function App() {
               <div>Proyecto</div><div>Aplicación</div><div className="timeline-head"><div className="year">2026</div><div className="months">{MONTHS.map(m => <span key={m}>{m}</span>)}</div></div>
               <div>Estado</div><div>Responsable</div><div>Componentes</div><div>Dirección</div>
             </div>
+
+            {todayInRange && visibleProjects.length > 0 && (
+              <div
+                className="today-line"
+                style={{ left: `calc(var(--left1) + var(--left2) + var(--timeline-w) * ${todayPct / 100})` } as React.CSSProperties}
+                title={`Hoy: ${formatDate(today)}`}
+              >
+                <span className="today-label">Hoy</span>
+              </div>
+            )}
 
             {visibleProjects.length
               ? visibleProjects.map(p => <RoadmapRow key={p.key} p={p} statusIcon={statusIcon[p.status]} />)
