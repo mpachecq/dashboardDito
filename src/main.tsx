@@ -621,7 +621,7 @@ function RoadmapRow({ p, statusIcon }: { p: Project, statusIcon:string }) {
         // Rango: segmento con ancho real. Punto (p.ej. PaP): ancho 0 -> un solo círculo.
         const w = ph.isRange ? Math.max(0.6, ph.x2 - ph.x1) : 0
         return (
-          <div className={`phase phase-${ph.key} lane-${ph.lane} ${ph.isRange ? 'is-range' : 'is-point'}`} key={ph.i} style={{left:`${ph.x1}%`, width:`${w}%`}}>
+          <div className={`phase phase-${ph.key} lane-${ph.lane} ${ph.isRange ? 'is-range' : 'is-point'}${ph.key === 'pap' ? ' date-right' : ''}`} key={ph.i} style={{left:`${ph.x1}%`, width:`${w}%`}}>
             <em className="phase-start">{formatDate(ph.start)}</em>
             <span className="phase-seg" />
             {ph.isRange && <em className="phase-end">{formatDate(ph.end)}</em>}

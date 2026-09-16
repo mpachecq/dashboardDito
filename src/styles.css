@@ -111,9 +111,13 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#1838
 .phase.is-point .phase-seg:after{display:none}
 .phase.is-point .phase-seg:before{left:50%;transform:translate(-50%,-50%)}
 /* Fecha de inicio (izquierda) y fin (derecha, solo si es rango) */
-.phase em{position:absolute;font-style:normal;font-size:9px;font-weight:700;color:#31558b;white-space:nowrap}
-.phase .phase-start{right:100%;margin-right:6px;top:1px}
-.phase .phase-end{left:100%;margin-left:6px;top:1px}
+/* Fechas: centradas a la altura del punto y separadas del círculo para no taparlo.
+   El punto sobresale ~9px del borde del segmento, por eso el margen es mayor. */
+.phase em{position:absolute;top:9px;transform:translateY(-50%);font-style:normal;font-size:9px;font-weight:700;color:#31558b;white-space:nowrap}
+.phase .phase-start{right:100%;margin-right:11px}
+.phase .phase-end{left:100%;margin-left:11px}
+/* PaP: la fecha va a la derecha del punto (así no se oculta contra el borde). */
+.phase.date-right .phase-start{right:auto;left:100%;margin-right:0;margin-left:11px}
 /* Etiqueta de etapa: lane-0 encima, lane-1 debajo */
 .phase .phase-label{position:absolute;left:0;font-size:8px;font-weight:700;letter-spacing:.2px;white-space:nowrap;text-transform:uppercase;opacity:.85}
 .phase.lane-0 .phase-label{bottom:100%;margin-bottom:1px}
