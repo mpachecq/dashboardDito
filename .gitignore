@@ -1,0 +1,12 @@
+# Dependencias
+node_modules/
+
+# Artefactos de build
+dist/
+*.tsbuildinfo
+
+# Logs y temporales
+*.log
+.DS_Store
+
+# Nota: public/matriz.xlsx SÍ se versiona (son los datos compartidos de la web).

@@ -1,0 +1,141 @@
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#18386e}
+.app{min-height:100vh;padding:26px 28px 38px}
+.topbar{display:flex;align-items:center;gap:24px;border-bottom:1px solid #e1e7ef;padding:0 8px 18px}
+.topbar h1{margin:0;font-size:27px;letter-spacing:.2px;color:#173b78}
+.topbar p{margin:5px 0 0;color:#6c7890}
+.upload{margin-left:auto;border:0;border-radius:9px;background:#173b78;color:#fff;font-weight:700;padding:12px 20px;cursor:pointer;box-shadow:0 3px 8px #173b7830}
+.upload:hover{background:#0f2c5c}
+.toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:16px;margin:15px 0}
+.file-pill{background:#f3f6fa;border:1px solid #dce4ee;border-radius:7px;padding:8px 12px;color:#50627c}
+.hint{font-size:12px;color:#748198}
+.control{display:flex;flex-direction:column;gap:3px;font-size:11px;color:#6c7890;font-weight:700}
+.control select{font-size:13px;font-weight:400;color:#18386e;padding:7px 10px;border:1px solid #cdd8e8;border-radius:7px;background:#fff;cursor:pointer;min-width:170px}
+.control select:focus{outline:none;border-color:#173b78}
+.zoom-buttons{display:flex;gap:6px}
+.zoom-buttons button{width:34px;height:34px;border:1px solid #cdd8e8;background:#fff;color:#173b78;font-size:18px;font-weight:700;border-radius:7px;cursor:pointer;line-height:1}
+.zoom-buttons button:hover:not(:disabled){background:#f3f6fa}
+.zoom-buttons button:disabled{opacity:.4;cursor:default}
+.reset{align-self:flex-end;border:1px solid #cdd8e8;background:#fff;color:#173b78;font-weight:700;padding:8px 15px;border-radius:7px;cursor:pointer}
+.reset:hover:not(:disabled){background:#f3f6fa}
+.reset:disabled{opacity:.45;cursor:default}
+.count{margin-left:auto;font-size:12px;color:#748198;font-weight:600}
+.empty{padding:26px;text-align:center;color:#748198;font-size:14px}
+.error{background:#fff0f0;border:1px solid #f4b5b5;color:#a51d1d;padding:10px 13px;border-radius:7px;margin-bottom:12px}
+
+.stats{display:grid;grid-template-columns:repeat(6,1fr);border:1px solid #c8d5e7;border-radius:17px;overflow:hidden;margin-bottom:24px}
+.stat{display:flex;align-items:center;gap:15px;padding:16px 20px;border-right:1px solid #d9e1ec}
+.stat:last-child{border-right:0}
+.stat i{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-style:normal;background:#173b78;color:#fff;font-weight:800;font-size:20px}
+.stat b{display:block;font-size:25px;color:#18386e}
+.stat span{font-size:12px;color:#294b80}
+.stat:nth-child(2) i{background:#4ca942}
+.stat:nth-child(3) i{background:#1d6fc1}
+.stat:nth-child(4) i{background:#f5a900}
+.stat:nth-child(5) i{background:#8a93a3}
+.stat:nth-child(6) i{background:#eb252c}
+
+.roadmap-card{border:1px solid #d2dce9;border-radius:3px;box-shadow:0 1px 3px #173b7810}
+/* --- Timeline navegable ---
+   Cada mes tiene un ancho fijo cómodo (--month-w) para que los rangos de pocos
+   días sean visibles. El timeline completo (7 meses) suele ser más ancho que la
+   pantalla, así que la tabla scrollea horizontalmente. Ajusta --month-w para
+   "acercar" o "alejar" el zoom del roadmap. */
+.roadmap-card{--month-w:200px;--months:7;--timeline-w:calc(var(--month-w) * var(--months));
+  /* columnas laterales fijas */
+  --left1:330px;--left2:85px;--r1:110px;--r2:130px;--r3:150px;--r4:110px}
+/* El scroll horizontal vive solo en la tabla, no en toda la página. */
+.roadmap-scroll{overflow-x:auto;overflow-y:hidden}
+/* Ancho total = laterales + timeline, para alinear encabezado y filas al scroll. */
+.roadmap-inner{width:calc(var(--left1) + var(--left2) + var(--timeline-w) + var(--r1) + var(--r2) + var(--r3) + var(--r4))}
+.grid{display:grid;grid-template-columns:var(--left1) var(--left2) var(--timeline-w) var(--r1) var(--r2) var(--r3) var(--r4)}
+.grid>div:last-child{border-right:0}
+.header-row{background:#123675;color:white;font-weight:700;font-size:13px;min-height:59px}
+.header-row>div{padding:12px 10px;border-right:1px solid #6f86ad;display:flex;align-items:center;justify-content:center}
+.timeline-head{padding:0!important;display:block!important}
+.year{height:27px;text-align:center;padding-top:7px}
+.months{display:grid;grid-template-columns:repeat(var(--months),1fr);height:32px}
+.months span{display:grid;place-items:center;border-top:1px solid #6f86ad;font-size:11px}
+
+.data-row{min-height:88px;border-bottom:1px solid #dbe2ec;background:#fff;font-size:12px}
+.data-row:nth-child(even){background:#fafcff}
+.data-row>div{border-right:1px solid #e1e7ef}
+.project-cell{display:flex;flex-direction:column;justify-content:center;gap:3px;padding:8px 12px}
+.project-cell b{font-size:12px;color:#123675}
+.project-cell span{color:#333;line-height:1.25}
+.project-cell .dev-team{font-size:10px;color:#8a93a3;font-weight:400;line-height:1.2;margin-top:1px}
+.app-cell,.status,.responsible,.components,.direction{display:flex;align-items:center;justify-content:center;padding:8px 10px;text-align:center}
+.responsible,.direction{font-weight:600;color:#2b4874}
+/* Componentes puede tener textos largos: permitir salto de línea sin cortar. */
+.components{font-weight:500;color:#5a6b88;font-size:11px;white-space:normal;overflow-wrap:anywhere;line-height:1.3}
+
+.timeline{position:relative;overflow:visible}
+.timeline:before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(to right,transparent 0,transparent calc(14.285% - 1px),#edf1f6 calc(14.285% - 1px),#edf1f6 14.285%);pointer-events:none}
+
+/* Línea base tenue que conecta todo el rango del proyecto (de inicio a fin). */
+.bar-base{position:absolute;height:3px;top:40px;background:#dbe3ee;border-radius:2px;z-index:1}
+.dash{position:absolute;left:2%;right:70%;top:40px;border-top:3px dashed #cfd6e0}
+
+/* Cada fase es un segmento con inicio y fin, repartido en dos carriles:
+   lane-0 arriba de la línea base, lane-1 debajo. Así no se recarga. */
+.phase{position:absolute;height:16px;z-index:3;pointer-events:none}
+.phase.lane-0{top:18px}
+.phase.lane-1{top:46px}
+.phase .phase-seg{position:absolute;left:0;right:0;top:6px;height:6px;border-radius:3px;background:currentColor}
+/* Punto de inicio y de fin del segmento */
+.phase .phase-seg:before,.phase .phase-seg:after{content:"";position:absolute;top:50%;width:11px;height:11px;border-radius:50%;background:#fff;border:3px solid currentColor;transform:translateY(-50%)}
+.phase .phase-seg:before{left:-2px}
+.phase .phase-seg:after{right:-2px}
+/* Fase de un solo día (p.ej. PaP): sin barra ni segundo círculo, solo un punto. */
+.phase.is-point .phase-seg{background:transparent}
+.phase.is-point .phase-seg:after{display:none}
+.phase.is-point .phase-seg:before{left:50%;transform:translate(-50%,-50%)}
+/* Fecha de inicio (izquierda) y fin (derecha, solo si es rango) */
+.phase em{position:absolute;font-style:normal;font-size:9px;font-weight:700;color:#31558b;white-space:nowrap}
+.phase .phase-start{right:100%;margin-right:6px;top:1px}
+.phase .phase-end{left:100%;margin-left:6px;top:1px}
+/* Etiqueta de etapa: lane-0 encima, lane-1 debajo */
+.phase .phase-label{position:absolute;left:0;font-size:8px;font-weight:700;letter-spacing:.2px;white-space:nowrap;text-transform:uppercase;opacity:.85}
+.phase.lane-0 .phase-label{bottom:100%;margin-bottom:1px}
+.phase.lane-1 .phase-label{top:100%;margin-top:1px}
+
+/* Colores por etapa (aplicados vía currentColor a segmento y puntos). */
+.phase-refinamiento{color:#9b6cd6}
+.phase-desarrollo{color:#f4a300}
+.phase-testing{color:#1e6fc5}
+.phase-pap{color:#4ca942}
+
+.status{flex-direction:column;gap:3px}
+.status i{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;color:#fff;font-style:normal;font-weight:900;font-size:12px}
+.status span{font-size:10px;font-weight:700;color:#3a557f}
+.status.produccion i{background:#4ca942}
+.status.testing i{background:#1d6fc1}
+.status.desarrollo i{background:#f5a900}
+.status.planificado i{background:#8a93a3}
+.status.refinamiento i{background:#a4abb8}
+.status.definicion i{background:#c1c7d1}
+.status.cancelado i{background:#ed2224}
+.status.sin-estado i{background:#c1c7d1}
+
+.legend{display:flex;align-items:center;flex-wrap:wrap;gap:18px;padding:12px 22px;background:#f9fafc;border-top:1px solid #dbe2ec;font-size:12px}
+.legend strong{font-size:13px;margin-right:6px;color:#42557a}
+.legend-item{display:flex;align-items:center;gap:7px}
+.legend-sep{width:1px;height:20px;background:#d3dbe7;margin:0 4px}
+/* Muestra de segmento de etapa en la leyenda */
+.legend .seg{width:26px;height:6px;border-radius:3px;background:currentColor;position:relative}
+.legend .seg:before,.legend .seg:after{content:"";position:absolute;top:50%;width:9px;height:9px;border-radius:50%;background:#fff;border:2px solid currentColor;transform:translateY(-50%)}
+.legend .seg:before{left:-1px}
+.legend .seg:after{right:-1px}
+.dot{width:21px;height:21px;border-radius:50%;display:grid;place-items:center;font-style:normal;color:#fff;font-weight:800;font-size:12px}
+.dot.produccion{background:#4ca942}
+.dot.testing{background:#1d6fc1}
+.dot.desarrollo{background:#f5a900}
+.dot.planificado{background:#8a93a3}
+.dot.refinamiento{background:#a4abb8}
+.dot.definicion{background:#c1c7d1}
+.dot.cancelado{background:#ed2224}
+
+/* En pantallas angostas, las tarjetas de estadísticas se reacomodan en 3/2 columnas
+   y la tabla scrollea horizontalmente por sí sola (.roadmap-scroll). */
+@media(max-width:1100px){.stats{grid-template-columns:repeat(3,1fr)}.stat:nth-child(3n) {border-right:0}}
+@media(max-width:640px){.stats{grid-template-columns:repeat(2,1fr)}.stat{border-right:1px solid #d9e1ec}}
