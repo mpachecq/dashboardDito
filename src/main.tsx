@@ -326,6 +326,7 @@ type SortMode = 'none' | 'pap-asc' | 'pap-desc'
 type StatusGroup = 'produccion' | 'testing' | 'desarrollo' | 'planificado' | 'cancelado'
 type StatusFilter = StatusGroup | 'all'
 const ALL_APPS = '__all__'
+const ALL_RESP = '__all_resp__'
 
 // Devuelve el grupo de estado al que pertenece un proyecto (planificado agrupa
 // planificado/refinamiento/definición, igual que las tarjetas de estadísticas).
@@ -343,6 +344,7 @@ function App() {
   const [fileName, setFileName] = useState('Ejemplo')
   const [error, setError] = useState('')
   const [appFilter, setAppFilter] = useState<string>(ALL_APPS)
+  const [responsibleFilter, setResponsibleFilter] = useState<string>(ALL_RESP)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [query, setQuery] = useState('') // búsqueda por código/nombre de proyecto
   const [sortMode, setSortMode] = useState<SortMode>('none')
@@ -359,16 +361,23 @@ function App() {
     [projects]
   )
 
-  // Proyectos filtrados por aplicación y búsqueda de proyecto (código o nombre).
-  // Es la base para las tarjetas de estado, así que sus conteos reflejan la búsqueda.
+  // Responsables únicos presentes en los datos, para poblar el selector.
+  const responsibles = useMemo(
+    () => Array.from(new Set(projects.map(p => p.responsible).filter(r => r && r !== '—'))).sort(),
+    [projects]
+  )
+
+  // Proyectos filtrados por aplicación, responsable y búsqueda (código o nombre).
+  // Es la base para las tarjetas de estado, así que sus conteos reflejan los filtros.
   const byApp = useMemo(() => {
     const q = normalize(query.trim())
     return projects.filter(p => {
       if (appFilter !== ALL_APPS && p.application !== appFilter) return false
+      if (responsibleFilter !== ALL_RESP && p.responsible !== responsibleFilter) return false
       if (q && !normalize(`${p.id} ${p.name}`).includes(q)) return false
       return true
     })
-  }, [projects, appFilter, query])
+  }, [projects, appFilter, responsibleFilter, query])
 
   // Proyectos visibles: filtro de aplicación + filtro de estado + orden por PaP.
   const visibleProjects = useMemo(() => {
@@ -386,9 +395,10 @@ function App() {
     return list
   }, [byApp, statusFilter, sortMode])
 
-  const isDirty = appFilter !== ALL_APPS || statusFilter !== 'all' || query.trim() !== '' || sortMode !== 'none' || monthWidth !== 200
+  const isDirty = appFilter !== ALL_APPS || responsibleFilter !== ALL_RESP || statusFilter !== 'all' || query.trim() !== '' || sortMode !== 'none' || monthWidth !== 200
   function resetView() {
     setAppFilter(ALL_APPS)
+    setResponsibleFilter(ALL_RESP)
     setStatusFilter('all')
     setQuery('')
     setSortMode('none')
@@ -490,6 +500,14 @@ function App() {
           <select value={appFilter} onChange={e => setAppFilter(e.target.value)}>
             <option value={ALL_APPS}>Todas</option>
             {applications.map(a => <option key={a} value={a}>{a}</option>)}
+          </select>
+        </label>
+
+        <label className="control">
+          <span>Responsable</span>
+          <select value={responsibleFilter} onChange={e => setResponsibleFilter(e.target.value)}>
+            <option value={ALL_RESP}>Todos</option>
+            {responsibles.map(r => <option key={r} value={r}>{r}</option>)}
           </select>
         </label>
 
