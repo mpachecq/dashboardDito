@@ -7,6 +7,7 @@ type RawRow = Record<string, unknown>
 
 type Status =
   | 'produccion'
+  | 'piloto'
   | 'testing'
   | 'desarrollo'
   | 'planificado'
@@ -163,6 +164,7 @@ function formatDate(d: Date | null) {
 
 const STATUS_LABELS: Record<Status, string> = {
   produccion: 'Producción',
+  piloto: 'Piloto',
   testing: 'Testing',
   desarrollo: 'Desarrollo',
   planificado: 'Planificado',
@@ -176,6 +178,7 @@ function statusFrom(value: unknown): Status {
   const s = normalize(String(value ?? ''))
   if (!s) return 'sin-estado'
   if (s.includes('produccion') || s.includes('entregado') || s.includes('pap')) return 'produccion'
+  if (s.includes('piloto') || s.includes('pilot')) return 'piloto'
   if (s.includes('testing') || s.includes('certificac') || s.includes('qa')) return 'testing'
   if (s.includes('desarrollo')) return 'desarrollo'
   if (s.includes('planificado') || s.includes('planeado')) return 'planificado'
@@ -338,7 +341,7 @@ function timelinePosition(date: Date): number {
 
 type SortMode = 'none' | 'pap-asc' | 'pap-desc'
 // Grupos de estado usados por las tarjetas-filtro (coinciden con los conteos).
-type StatusGroup = 'produccion' | 'testing' | 'desarrollo' | 'planificado' | 'cancelado'
+type StatusGroup = 'produccion' | 'piloto' | 'testing' | 'desarrollo' | 'planificado' | 'cancelado'
 type StatusFilter = StatusGroup | 'all'
 const ALL_APPS = '__all__'
 const ALL_RESP = '__all_resp__'
@@ -357,7 +360,7 @@ function directionKey(direction: string): string {
 // Devuelve el grupo de estado al que pertenece un proyecto (planificado agrupa
 // planificado/refinamiento/definición, igual que las tarjetas de estadísticas).
 function statusGroup(status: Status): StatusGroup | 'otros' {
-  if (status === 'produccion' || status === 'testing' || status === 'desarrollo' || status === 'cancelado') return status
+  if (status === 'produccion' || status === 'piloto' || status === 'testing' || status === 'desarrollo' || status === 'cancelado') return status
   if (status === 'planificado' || status === 'refinamiento' || status === 'definicion') return 'planificado'
   return 'otros'
 }
@@ -467,6 +470,7 @@ function App() {
     return {
       total: list.length,
       produccion: list.filter(p => p.status === 'produccion').length,
+      piloto: list.filter(p => p.status === 'piloto').length,
       testing: list.filter(p => p.status === 'testing').length,
       desarrollo: list.filter(p => p.status === 'desarrollo').length,
       planificado: list.filter(p => statusGroup(p.status) === 'planificado').length,
@@ -517,7 +521,7 @@ function App() {
   }, [])
 
   const statusIcon: Record<Status, string> = {
-    produccion: '✓', testing: '⚑', desarrollo: '▣', planificado: '◷',
+    produccion: '✓', piloto: '✈', testing: '⚑', desarrollo: '▣', planificado: '◷',
     refinamiento: '◔', definicion: '○', cancelado: '×', 'sin-estado': '—'
   }
 
@@ -593,6 +597,7 @@ function App() {
       <section className="stats">
         <Stat value={stats.total} label="Proyectos totales" icon="▥" active={statusFilter === 'all'} onClick={() => setStatusFilter('all')} />
         <Stat value={stats.produccion} label="Producción" icon="✓" status="produccion" active={statusFilter === 'produccion'} onClick={() => toggleStatus('produccion')} />
+        <Stat value={stats.piloto} label="Piloto" icon="✈" status="piloto" active={statusFilter === 'piloto'} onClick={() => toggleStatus('piloto')} />
         <Stat value={stats.testing} label="Testing" icon="⚑" status="testing" active={statusFilter === 'testing'} onClick={() => toggleStatus('testing')} />
         <Stat value={stats.desarrollo} label="Desarrollo" icon="▣" status="desarrollo" active={statusFilter === 'desarrollo'} onClick={() => toggleStatus('desarrollo')} />
         <Stat value={stats.planificado} label="Planificado / Backlog" icon="◷" status="planificado" active={statusFilter === 'planificado'} onClick={() => toggleStatus('planificado')} />
@@ -653,6 +658,7 @@ function App() {
               <span className="legend-sep" />
               <strong>ESTADO</strong>
               <span className="legend-item"><i className="dot produccion">✓</i> Producción</span>
+              <span className="legend-item"><i className="dot piloto">✈</i> Piloto</span>
               <span className="legend-item"><i className="dot testing">⚑</i> Testing</span>
               <span className="legend-item"><i className="dot desarrollo">▣</i> Desarrollo</span>
               <span className="legend-item"><i className="dot planificado">◷</i> Planificado</span>

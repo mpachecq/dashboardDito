@@ -28,27 +28,30 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#1838
 .empty{padding:26px;text-align:center;color:#748198;font-size:14px}
 .error{background:#fff0f0;border:1px solid #f4b5b5;color:#a51d1d;padding:10px 13px;border-radius:7px;margin-bottom:12px}
 
-.stats{display:grid;grid-template-columns:repeat(6,1fr);border:1px solid #c8d5e7;border-radius:17px;overflow:hidden;margin-bottom:24px}
+.stats{display:grid;grid-template-columns:repeat(7,1fr);border:1px solid #c8d5e7;border-radius:17px;overflow:hidden;margin-bottom:24px}
 /* Cada tarjeta es un botón-filtro por estado. */
-.stat{display:flex;align-items:center;gap:15px;padding:16px 20px;border:0;border-right:1px solid #d9e1ec;background:#fff;font:inherit;text-align:left;cursor:pointer;position:relative;transition:background .12s}
+.stat{display:flex;align-items:center;gap:11px;padding:15px 14px;border:0;border-right:1px solid #d9e1ec;background:#fff;font:inherit;text-align:left;cursor:pointer;position:relative;transition:background .12s}
 .stat:last-child{border-right:0}
 .stat:hover{background:#f3f7fc}
 .stat.active{background:#eef4fc}
 /* Barra superior de color que marca la tarjeta activa. */
 .stat.active:before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:#173b78}
 .stat.active.stat-produccion:before{background:#4ca942}
+.stat.active.stat-piloto:before{background:#6b4fd1}
 .stat.active.stat-testing:before{background:#1d6fc1}
 .stat.active.stat-desarrollo:before{background:#f5a900}
 .stat.active.stat-planificado:before{background:#8a93a3}
 .stat.active.stat-cancelado:before{background:#eb252c}
-.stat i{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-style:normal;background:#173b78;color:#fff;font-weight:800;font-size:20px;flex:none}
-.stat b{display:block;font-size:25px;color:#18386e}
-.stat span{font-size:12px;color:#294b80}
-.stat:nth-child(2) i{background:#4ca942}
-.stat:nth-child(3) i{background:#1d6fc1}
-.stat:nth-child(4) i{background:#f5a900}
-.stat:nth-child(5) i{background:#8a93a3}
-.stat:nth-child(6) i{background:#eb252c}
+.stat i{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-style:normal;background:#173b78;color:#fff;font-weight:800;font-size:18px;flex:none}
+.stat b{display:block;font-size:22px;color:#18386e;line-height:1.1}
+.stat span{font-size:11px;color:#294b80}
+/* Color del icono por estado (robusto ante nuevos estados/orden). */
+.stat.stat-produccion i{background:#4ca942}
+.stat.stat-piloto i{background:#6b4fd1}
+.stat.stat-testing i{background:#1d6fc1}
+.stat.stat-desarrollo i{background:#f5a900}
+.stat.stat-planificado i{background:#8a93a3}
+.stat.stat-cancelado i{background:#eb252c}
 
 /* Filtros de dirección: botones-pill con conteo, en el hueco bajo las tarjetas. */
 .dir-filters{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:-8px 0 22px}
@@ -157,6 +160,7 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#1838
 .status i{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;color:#fff;font-style:normal;font-weight:900;font-size:12px}
 .status span{font-size:10px;font-weight:700;color:#3a557f}
 .status.produccion i{background:#4ca942}
+.status.piloto i{background:#6b4fd1}
 .status.testing i{background:#1d6fc1}
 .status.desarrollo i{background:#f5a900}
 .status.planificado i{background:#8a93a3}
@@ -176,6 +180,7 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#1838
 .legend .seg:after{right:-1px}
 .dot{width:21px;height:21px;border-radius:50%;display:grid;place-items:center;font-style:normal;color:#fff;font-weight:800;font-size:12px}
 .dot.produccion{background:#4ca942}
+.dot.piloto{background:#6b4fd1}
 .dot.testing{background:#1d6fc1}
 .dot.desarrollo{background:#f5a900}
 .dot.planificado{background:#8a93a3}
