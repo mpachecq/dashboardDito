@@ -28,7 +28,8 @@ type Phase = {
 
 type Project = {
   key: string
-  id: string
+  id: string        // código del proyecto padre (primera línea de la celda Proyecto)
+  childId: string   // código del proyecto hijo (segunda línea), vacío si no hay
   name: string
   application: string
   status: Status
@@ -200,6 +201,14 @@ function optionalText(row: RawRow, col: string | undefined): string {
   return /^(na|n\/a)$/i.test(s) ? '' : s
 }
 
+// Devuelve las líneas no vacías de una celda (preserva los saltos de línea).
+// Se usa para la columna Proyecto: padre en la 1ª línea, hijo en la 2ª.
+function textLines(row: RawRow, col: string | undefined): string[] {
+  const v = cell(row, col)
+  if (v == null) return []
+  return String(v).split(/\r\n|\r|\n/).map(s => s.trim()).filter(Boolean)
+}
+
 function excelToProjects(rows: RawRow[]): Project[] {
   if (!rows.length) return []
   const headers = Object.keys(rows[0])
@@ -243,9 +252,15 @@ function excelToProjects(rows: RawRow[]): Project[] {
       const statusRaw = text(row, cols.status)
       const status = statusFrom(statusRaw)
 
+      // La celda Proyecto puede traer padre e hijo en líneas separadas.
+      const idLines = textLines(row, cols.id)
+      const parentId = idLines[0] || `PROY-${index + 1}`
+      const childId = idLines.slice(1).join(' ')
+
       return {
-        key: `row-${index}-${text(row, cols.id, '')}`,
-        id: text(row, cols.id, `PROY-${index + 1}`),
+        key: `row-${index}-${parentId}-${childId}`,
+        id: parentId,
+        childId,
         name: text(row, cols.name, `Proyecto ${index + 1}`),
         application: text(row, cols.application, '—'),
         status,
@@ -296,7 +311,7 @@ function sampleProjects(): Project[] {
     ].filter(Boolean) as Phase[]
     const dates = phases.flatMap(ph => [ph.start, ph.end]).sort((a, b) => a.getTime() - b.getTime())
     return {
-      key: id, id, name, application, status, statusLabel: STATUS_LABELS[status],
+      key: id, id, childId: '', name, application, status, statusLabel: STATUS_LABELS[status],
       stage: STATUS_LABELS[status], responsible, devTeam, components: '—', direction,
       start: dates[0] ?? null, end: dates[dates.length - 1] ?? null,
       pap: pap ? d(pap.split('|')[0]) : null, phases
@@ -327,6 +342,17 @@ type StatusGroup = 'produccion' | 'testing' | 'desarrollo' | 'planificado' | 'ca
 type StatusFilter = StatusGroup | 'all'
 const ALL_APPS = '__all__'
 const ALL_RESP = '__all_resp__'
+const ALL_DIR = '__all_dir__'
+
+// Clave de dirección normalizada, para asignar color de forma estable aunque el
+// texto venga con acentos o mayúsculas distintas.
+function directionKey(direction: string): string {
+  const d = normalize(direction)
+  if (d.includes('regulator')) return 'regulatorio'
+  if (d.includes('negocio')) return 'negocio'
+  if (d.includes('tecnolog')) return 'tecnologia'
+  return d || 'sin'
+}
 
 // Devuelve el grupo de estado al que pertenece un proyecto (planificado agrupa
 // planificado/refinamiento/definición, igual que las tarjetas de estadísticas).
@@ -345,6 +371,7 @@ function App() {
   const [error, setError] = useState('')
   const [appFilter, setAppFilter] = useState<string>(ALL_APPS)
   const [responsibleFilter, setResponsibleFilter] = useState<string>(ALL_RESP)
+  const [directionFilter, setDirectionFilter] = useState<string>(ALL_DIR)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [query, setQuery] = useState('') // búsqueda por código/nombre de proyecto
   const [sortMode, setSortMode] = useState<SortMode>('none')
@@ -367,21 +394,32 @@ function App() {
     [projects]
   )
 
-  // Proyectos filtrados por aplicación, responsable y búsqueda (código o nombre).
-  // Es la base para las tarjetas de estado, así que sus conteos reflejan los filtros.
-  const byApp = useMemo(() => {
+  // Direcciones únicas presentes en los datos, para poblar el selector.
+  const directions = useMemo(
+    () => Array.from(new Set(projects.map(p => p.direction).filter(d => d && d !== '—'))).sort(),
+    [projects]
+  )
+
+  // Proyectos filtrados por aplicación, responsable, dirección y búsqueda
+  // (código padre/hijo o nombre). NO incluye los filtros de estado ni dirección,
+  // porque esos se muestran como botones-tarjeta con conteo y no deben filtrarse
+  // a sí mismos.
+  const baseList = useMemo(() => {
     const q = normalize(query.trim())
     return projects.filter(p => {
       if (appFilter !== ALL_APPS && p.application !== appFilter) return false
       if (responsibleFilter !== ALL_RESP && p.responsible !== responsibleFilter) return false
-      if (q && !normalize(`${p.id} ${p.name}`).includes(q)) return false
+      if (q && !normalize(`${p.id} ${p.childId} ${p.name}`).includes(q)) return false
       return true
     })
   }, [projects, appFilter, responsibleFilter, query])
 
-  // Proyectos visibles: filtro de aplicación + filtro de estado + orden por PaP.
+  // Proyectos visibles: base + filtro de estado + filtro de dirección + orden.
   const visibleProjects = useMemo(() => {
-    let list = statusFilter === 'all' ? byApp : byApp.filter(p => statusGroup(p.status) === statusFilter)
+    let list = baseList.filter(p =>
+      (statusFilter === 'all' || statusGroup(p.status) === statusFilter) &&
+      (directionFilter === ALL_DIR || p.direction === directionFilter)
+    )
     if (sortMode !== 'none') {
       const dir = sortMode === 'pap-asc' ? 1 : -1
       list = [...list].sort((a, b) => {
@@ -393,12 +431,13 @@ function App() {
       })
     }
     return list
-  }, [byApp, statusFilter, sortMode])
+  }, [baseList, statusFilter, directionFilter, sortMode])
 
-  const isDirty = appFilter !== ALL_APPS || responsibleFilter !== ALL_RESP || statusFilter !== 'all' || query.trim() !== '' || sortMode !== 'none' || monthWidth !== 200
+  const isDirty = appFilter !== ALL_APPS || responsibleFilter !== ALL_RESP || directionFilter !== ALL_DIR || statusFilter !== 'all' || query.trim() !== '' || sortMode !== 'none' || monthWidth !== 200
   function resetView() {
     setAppFilter(ALL_APPS)
     setResponsibleFilter(ALL_RESP)
+    setDirectionFilter(ALL_DIR)
     setStatusFilter('all')
     setQuery('')
     setSortMode('none')
@@ -409,6 +448,10 @@ function App() {
   function toggleStatus(group: StatusFilter) {
     setStatusFilter(prev => prev === group ? 'all' : group)
   }
+  // Alterna el filtro de dirección desde su botón-tarjeta.
+  function toggleDirection(dir: string) {
+    setDirectionFilter(prev => prev === dir ? ALL_DIR : dir)
+  }
 
   // Posición de la fecha de hoy dentro del timeline (0..1). Solo se muestra la
   // línea "hoy" si la fecha actual cae dentro del rango visible (Jun–Dic 2026).
@@ -417,16 +460,26 @@ function App() {
   const todayInRange = todayRaw >= 0 && todayRaw <= MONTH_COUNT
   const todayPct = (todayRaw / MONTH_COUNT) * 100
 
-  // Conteos por estado calculados sobre la lista filtrada por aplicación (sin el
-  // filtro de estado), para que las tarjetas siempre muestren los totales reales.
-  const stats = useMemo(() => ({
-    total: byApp.length,
-    produccion: byApp.filter(p => p.status === 'produccion').length,
-    testing: byApp.filter(p => p.status === 'testing').length,
-    desarrollo: byApp.filter(p => p.status === 'desarrollo').length,
-    planificado: byApp.filter(p => statusGroup(p.status) === 'planificado').length,
-    cancelado: byApp.filter(p => p.status === 'cancelado').length
-  }), [byApp])
+  // Conteos por estado: sobre la base + filtro de dirección (pero sin el propio
+  // filtro de estado), para que las tarjetas muestren los totales de ese contexto.
+  const stats = useMemo(() => {
+    const list = directionFilter === ALL_DIR ? baseList : baseList.filter(p => p.direction === directionFilter)
+    return {
+      total: list.length,
+      produccion: list.filter(p => p.status === 'produccion').length,
+      testing: list.filter(p => p.status === 'testing').length,
+      desarrollo: list.filter(p => p.status === 'desarrollo').length,
+      planificado: list.filter(p => statusGroup(p.status) === 'planificado').length,
+      cancelado: list.filter(p => p.status === 'cancelado').length
+    }
+  }, [baseList, directionFilter])
+
+  // Conteos por dirección: sobre la base + filtro de estado (sin el propio filtro
+  // de dirección). Cada entrada alimenta un botón-tarjeta de dirección.
+  const dirStats = useMemo(() => {
+    const list = statusFilter === 'all' ? baseList : baseList.filter(p => statusGroup(p.status) === statusFilter)
+    return directions.map(d => ({ name: d, count: list.filter(p => p.direction === d).length }))
+  }, [baseList, statusFilter, directions])
 
   async function handleFile(file: File) {
     setError('')
@@ -511,6 +564,8 @@ function App() {
           </select>
         </label>
 
+
+
         <label className="control">
           <span>Ordenar por PaP</span>
           <select value={sortMode} onChange={e => setSortMode(e.target.value as SortMode)}>
@@ -544,12 +599,35 @@ function App() {
         <Stat value={stats.cancelado} label="Cancelado" icon="×" status="cancelado" active={statusFilter === 'cancelado'} onClick={() => toggleStatus('cancelado')} />
       </section>
 
+      {directions.length > 0 && (
+        <section className="dir-filters">
+          <span className="dir-filters-title">Dirección</span>
+          <button
+            type="button"
+            className={`dir-btn dir-all${directionFilter === ALL_DIR ? ' active' : ''}`}
+            onClick={() => setDirectionFilter(ALL_DIR)}
+          >
+            <b>{baseList.length}</b> Todas
+          </button>
+          {dirStats.map(d => (
+            <button
+              key={d.name}
+              type="button"
+              className={`dir-btn dir-${directionKey(d.name)}${directionFilter === d.name ? ' active' : ''}`}
+              onClick={() => toggleDirection(d.name)}
+            >
+              <b>{d.count}</b> {d.name}
+            </button>
+          ))}
+        </section>
+      )}
+
       <main className="roadmap-card" style={{ '--month-w': `${monthWidth}px` } as React.CSSProperties}>
         <div className="roadmap-scroll">
           <div className="roadmap-inner">
             <div className="grid header-row">
               <div>Proyecto</div><div>Aplicación</div><div className="timeline-head"><div className="year">2026</div><div className="months">{MONTHS.map(m => <span key={m}>{m}</span>)}</div></div>
-              <div>Estado</div><div>Responsable</div><div>Componentes</div><div>Dirección</div>
+              <div>Estado</div><div>Responsable</div><div>Componentes</div>
             </div>
 
             {todayInRange && visibleProjects.length > 0 && (
@@ -579,6 +657,11 @@ function App() {
               <span className="legend-item"><i className="dot desarrollo">▣</i> Desarrollo</span>
               <span className="legend-item"><i className="dot planificado">◷</i> Planificado</span>
               <span className="legend-item"><i className="dot cancelado">×</i> Cancelado</span>
+              <span className="legend-sep" />
+              <strong>DIRECCIÓN</strong>
+              <span className="legend-item"><i className="dir-chip dir-regulatorio">Regulatorio</i></span>
+              <span className="legend-item"><i className="dir-chip dir-negocio">Negocio</i></span>
+              <span className="legend-item"><i className="dir-chip dir-tecnologia">Tecnología</i></span>
             </div>
           </div>
         </div>
@@ -626,9 +709,16 @@ function RoadmapRow({ p, statusIcon }: { p: Project, statusIcon:string }) {
 
   return <div className="grid data-row">
     <div className="project-cell">
-      <b>{p.id}</b>
+      <div className="project-ids">
+        <b>{p.id}</b>
+        {p.childId && <b className="child-id">{p.childId}</b>}
+      </div>
       <span>{p.name}</span>
-      {p.devTeam && <small className="dev-team">Dev: {p.devTeam}</small>}
+      <div className="project-meta">
+        {p.direction && p.direction !== '—' &&
+          <span className={`dir-chip dir-${directionKey(p.direction)}`}>{p.direction}</span>}
+        {p.devTeam && <small className="dev-team">Dev: {p.devTeam}</small>}
+      </div>
     </div>
     <div className="app-cell">{p.application}</div>
     <div className="timeline">
@@ -651,7 +741,6 @@ function RoadmapRow({ p, statusIcon }: { p: Project, statusIcon:string }) {
     <div className={`status ${p.status}`} title={p.statusLabel}><i>{statusIcon}</i><span>{p.statusLabel}</span></div>
     <div className="responsible">{p.responsible}</div>
     <div className="components">{p.components}</div>
-    <div className="direction">{p.direction}</div>
   </div>
 }
 

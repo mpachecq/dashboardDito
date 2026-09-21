@@ -50,6 +50,18 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#1838
 .stat:nth-child(5) i{background:#8a93a3}
 .stat:nth-child(6) i{background:#eb252c}
 
+/* Filtros de dirección: botones-pill con conteo, en el hueco bajo las tarjetas. */
+.dir-filters{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:-8px 0 22px}
+.dir-filters-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:#6c7890;margin-right:2px}
+.dir-btn{--c:#5a6b88;display:inline-flex;align-items:center;gap:7px;border:1.5px solid var(--c);background:#fff;color:var(--c);font:inherit;font-size:12px;font-weight:600;padding:6px 14px;border-radius:20px;cursor:pointer;transition:background .12s,color .12s}
+.dir-btn b{font-size:15px;font-weight:800}
+.dir-btn:hover{background:color-mix(in srgb,var(--c) 10%,#fff)}
+.dir-btn.active{background:var(--c);color:#fff}
+.dir-btn.dir-all{--c:#173b78}
+.dir-btn.dir-regulatorio{--c:#c0304a}
+.dir-btn.dir-negocio{--c:#1f5fb0}
+.dir-btn.dir-tecnologia{--c:#2f8a3c}
+
 .roadmap-card{border:1px solid #d2dce9;border-radius:3px;box-shadow:0 1px 3px #173b7810}
 /* --- Timeline navegable ---
    Cada mes tiene un ancho fijo cómodo (--month-w) para que los rangos de pocos
@@ -58,17 +70,17 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#1838
    "acercar" o "alejar" el zoom del roadmap. */
 .roadmap-card{--month-w:200px;--months:7;--timeline-w:calc(var(--month-w) * var(--months));
   /* columnas laterales fijas */
-  --left1:330px;--left2:85px;--r1:110px;--r2:130px;--r3:150px;--r4:110px}
+  --left1:360px;--left2:85px;--r1:110px;--r2:130px;--r3:170px}
 /* El scroll horizontal vive solo en la tabla, no en toda la página. */
 .roadmap-scroll{overflow-x:auto;overflow-y:hidden}
 /* Ancho total = laterales + timeline, para alinear encabezado y filas al scroll. */
-.roadmap-inner{position:relative;width:calc(var(--left1) + var(--left2) + var(--timeline-w) + var(--r1) + var(--r2) + var(--r3) + var(--r4))}
+.roadmap-inner{position:relative;width:calc(var(--left1) + var(--left2) + var(--timeline-w) + var(--r1) + var(--r2) + var(--r3))}
 
 /* Línea vertical de "hoy": sutil pero visible, cruza todas las filas del
    timeline desde debajo del encabezado (59px) hasta el borde de la leyenda. */
 .today-line{position:absolute;top:59px;bottom:0;width:0;border-left:2px dashed rgba(232,102,58,.4);z-index:4;pointer-events:none}
 .today-line .today-label{position:absolute;top:2px;left:50%;transform:translateX(-50%);background:#e8663a;color:#fff;font-size:9px;font-weight:700;letter-spacing:.3px;padding:1px 6px;border-radius:0 0 6px 6px;white-space:nowrap}
-.grid{display:grid;grid-template-columns:var(--left1) var(--left2) var(--timeline-w) var(--r1) var(--r2) var(--r3) var(--r4)}
+.grid{display:grid;grid-template-columns:var(--left1) var(--left2) var(--timeline-w) var(--r1) var(--r2) var(--r3)}
 .grid>div:last-child{border-right:0}
 .header-row{background:#123675;color:white;font-weight:700;font-size:13px;min-height:59px}
 .header-row>div{padding:12px 10px;border-right:1px solid #6f86ad;display:flex;align-items:center;justify-content:center}
@@ -81,9 +93,21 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#1838
 .data-row:nth-child(even){background:#fafcff}
 .data-row>div{border-right:1px solid #e1e7ef}
 .project-cell{display:flex;flex-direction:column;justify-content:center;gap:3px;padding:8px 12px}
-.project-cell b{font-size:12px;color:#123675}
+/* Códigos padre/hijo: el padre destaca, el hijo va debajo, más pequeño y tenue. */
+.project-ids{display:flex;flex-direction:column;line-height:1.1}
+.project-ids b{font-size:13px;color:#123675}
+.project-ids .child-id{font-size:12px;font-weight:700;color:#3a6fb5;margin-top:2px}
+.project-ids .child-id:before{content:"↳ ";opacity:.85;font-weight:400}
 .project-cell span{color:#333;line-height:1.25}
-.project-cell .dev-team{font-size:10px;color:#8a93a3;font-weight:400;line-height:1.2;margin-top:1px}
+/* Fila inferior de la celda: chip de dirección + equipo de desarrollo. */
+.project-meta{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:2px}
+.project-cell .dev-team{font-size:10px;color:#8a93a3;font-weight:400;line-height:1.2}
+/* Chip de dirección: color por área, sin ocupar una columna extra. */
+.dir-chip{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.2px;text-transform:uppercase;padding:2px 7px;border-radius:10px;line-height:1.4;white-space:nowrap}
+.dir-regulatorio{background:#fdecef;color:#c0304a}
+.dir-negocio{background:#e8f1fd;color:#1f5fb0}
+.dir-tecnologia{background:#eaf6ec;color:#2f8a3c}
+.dir-sin{background:#eef0f3;color:#6b7688}
 .app-cell,.status,.responsible,.components,.direction{display:flex;align-items:center;justify-content:center;padding:8px 10px;text-align:center}
 .responsible,.direction{font-weight:600;color:#2b4874}
 /* Componentes puede tener textos largos: permitir salto de línea sin cortar. */
