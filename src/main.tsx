@@ -47,7 +47,7 @@ type Project = {
   start: Date | null
   end: Date | null
   pap: Date | null
-  rollbacks: Date[]  // fechas de PaP previos revertidos (RB): PaP1 y PaP2 si ambos existen
+  rollbacks: { date: Date; label: string }[]  // PaP previos revertidos (RB)
   phases: Phase[]
 }
 
@@ -256,11 +256,15 @@ function excelToProjects(rows: RawRow[]): Project[] {
         { key: 'pap', range: parseDateCell(cell(row, cols.pap)) }
       ]
 
-      // Rollback: hay PaP previos revertidos cuando PaP1 Y PaP2 están llenos.
-      // Se marcan ambas fechas (PaP1 y PaP2) con un punto rojo "RB" en el timeline.
+      // Rollback: PaP3 es el PaP oficial. Cada PaP previo con fecha es un rollback:
+      //   PaP2 lleno            -> 1 rollback (en PaP2)
+      //   PaP1 y PaP2 llenos    -> 2 rollbacks (en PaP1 y PaP2)
       const pap1Date = parseSingleDate(cell(row, cols.pap1))
       const pap2Date = parseSingleDate(cell(row, cols.pap2))
-      const rollbacks: Date[] = (pap1Date && pap2Date) ? [pap1Date, pap2Date] : []
+      const rollbacks = [
+        pap1Date && { date: pap1Date, label: 'PaP1' },
+        pap2Date && { date: pap2Date, label: 'PaP2' }
+      ].filter((r): r is { date: Date; label: string } => !!r)
 
       // Cada etapa con fecha se convierte en una fase con inicio y fin.
       // Si la celda trae un rango real (inicio distinto de fin) se marca isRange.
@@ -281,7 +285,7 @@ function excelToProjects(rows: RawRow[]): Project[] {
       const papDate = pap.start ?? pap.end ?? null
 
       // Rango total del proyecto: primera y última fecha entre fases y rollbacks.
-      const allDates = [...phases.flatMap(ph => [ph.start, ph.end]), ...rollbacks].sort((a, b) => a.getTime() - b.getTime())
+      const allDates = [...phases.flatMap(ph => [ph.start, ph.end]), ...rollbacks.map(r => r.date)].sort((a, b) => a.getTime() - b.getTime())
       const start = allDates[0] ?? null
       const end = allDates[allDates.length - 1] ?? null
 
@@ -813,10 +817,10 @@ function RoadmapRow({ p, statusIcon }: { p: Project, statusIcon:string }) {
         : <div className="dash" />}
       {/* Marcadores de rollback (RB): PaP previos revertidos (PaP1, PaP2), en rojo. */}
       {p.rollbacks.map((rb, i) => {
-        const x = timelinePosition(rb) * 100
+        const x = timelinePosition(rb.date) * 100
         return (
-          <div className="rollback" key={`rb-${i}`} style={{left:`${x}%`}} title={`Rollback PaP${i + 1}: ${formatDate(rb)}`}>
-            <em className="rb-date">{formatDate(rb)}</em>
+          <div className="rollback" key={`rb-${i}`} style={{left:`${x}%`}} title={`Rollback (${rb.label}): ${formatDate(rb.date)}`}>
+            <em className="rb-date">{formatDate(rb.date)}</em>
             <span className="rb-dot" />
             <small className="rb-flag">RB</small>
           </div>
