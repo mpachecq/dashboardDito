@@ -10,8 +10,11 @@ type Status =
   | 'piloto'
   | 'testing'
   | 'desarrollo'
+  | 'por-aprobar'
   | 'planificado'
   | 'refinamiento'
+  | 'listo-refinar'
+  | 'ean-listo'
   | 'definicion'
   | 'cancelado'
   | 'sin-estado'
@@ -35,6 +38,7 @@ type Project = {
   application: string
   status: Status
   statusLabel: string
+  statusJira: string
   stage: string
   responsible: string
   devTeam: string
@@ -43,6 +47,7 @@ type Project = {
   start: Date | null
   end: Date | null
   pap: Date | null
+  rollbacks: Date[]  // fechas de PaP previos revertidos (RB): PaP1 y PaP2 si ambos existen
   phases: Phase[]
 }
 
@@ -57,12 +62,16 @@ const MONTHS = ['Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre'
 // Meses cubiertos por el timeline (índice de mes JS): Junio(5) .. Diciembre(11)
 const FIRST_MONTH = 5
 const MONTH_COUNT = MONTHS.length
+// Mes al que se desplaza el timeline por defecto al cargar (índice JS): Septiembre.
+// Se mantiene junio-agosto por si hay fechas tempranas, pero la vista inicia aquí.
+const DEFAULT_SCROLL_MONTH = 8
 
 const HEADER_ALIASES: Record<string, string[]> = {
   id: ['proyecto', 'id', 'codigo', 'código', 'project id', 'project'],
   name: ['titulo', 'título', 'nombre', 'project name', 'descripcion', 'descripción'],
   application: ['aplicacion', 'aplicación', 'app', 'canal', 'application'],
   status: ['estado', 'status'],
+  statusJira: ['estado_jira', 'estado jira', 'estadojira', 'jira'],
   responsible: ['responsable', 'owner', 'líder', 'lider'],
   devTeam: ['resp. nttdata', 'resp nttdata', 'nttdata', 'desarrollador', 'desarrolladores', 'equipo'],
   components: ['componentes impactados', 'componentes', 'components'],
@@ -70,7 +79,10 @@ const HEADER_ALIASES: Record<string, string[]> = {
   refinement: ['refinamiento', 'refinement'],
   development: ['desarrollo', 'development', 'dev'],
   testing: ['testing', 'certificacion', 'certificación', 'qa'],
-  pap: ['pap', 'pase a produccion', 'pase a producción', 'produccion', 'producción', 'fin']
+  // PaP oficial = PaP3. PaP1/PaP2 son PaP previos revertidos (rollback).
+  pap: ['pap3', 'pap 3'],
+  pap1: ['pap1', 'pap 1'],
+  pap2: ['pap2', 'pap 2']
 }
 
 const MONTH_NAMES: Record<string, number> = {
@@ -86,11 +98,19 @@ function normalize(s: string) {
 
 function findColumn(headers: string[], aliases: string[]) {
   const normalized = headers.map(normalize)
-  return aliases.map(normalize).reduce<string | undefined>((found, alias) => {
-    if (found) return found
-    const i = normalized.findIndex(h => h === alias || h.includes(alias) || alias.includes(h))
-    return i >= 0 ? headers[i] : undefined
-  }, undefined)
+  const normAliases = aliases.map(normalize)
+  // 1) Coincidencia exacta (prioritaria): evita que "estado" capture "estado_jira"
+  //    o viceversa cuando ambos existen como columnas.
+  for (const alias of normAliases) {
+    const i = normalized.findIndex(h => h === alias)
+    if (i >= 0) return headers[i]
+  }
+  // 2) Coincidencia parcial (fallback) para variantes de nombre.
+  for (const alias of normAliases) {
+    const i = normalized.findIndex(h => h.includes(alias) || alias.includes(h))
+    if (i >= 0) return headers[i]
+  }
+  return undefined
 }
 
 // Interpreta un valor de celda como una única fecha. Soporta:
@@ -167,8 +187,11 @@ const STATUS_LABELS: Record<Status, string> = {
   piloto: 'Piloto',
   testing: 'Testing',
   desarrollo: 'Desarrollo',
+  'por-aprobar': 'Por aprobar',
   planificado: 'Planificado',
   refinamiento: 'Refinamiento',
+  'listo-refinar': 'Listo para refinar',
+  'ean-listo': 'EAN Listo',
   definicion: 'Definición',
   cancelado: 'Cancelado',
   'sin-estado': 'Sin estado'
@@ -181,6 +204,9 @@ function statusFrom(value: unknown): Status {
   if (s.includes('piloto') || s.includes('pilot')) return 'piloto'
   if (s.includes('testing') || s.includes('certificac') || s.includes('qa')) return 'testing'
   if (s.includes('desarrollo')) return 'desarrollo'
+  if (s.includes('por aprobar') || s.includes('aprobacion') || s.includes('aprobación')) return 'por-aprobar'
+  if (s.includes('listo para refinar') || s.includes('listo refinar')) return 'listo-refinar'
+  if (s.includes('ean')) return 'ean-listo'
   if (s.includes('planificado') || s.includes('planeado')) return 'planificado'
   if (s.includes('refinamiento')) return 'refinamiento'
   if (s.includes('definicion') || s.includes('definición')) return 'definicion'
@@ -226,8 +252,15 @@ function excelToProjects(rows: RawRow[]): Project[] {
         { key: 'refinamiento', range: parseDateCell(cell(row, cols.refinement)) },
         { key: 'desarrollo', range: parseDateCell(cell(row, cols.development)) },
         { key: 'testing', range: parseDateCell(cell(row, cols.testing)) },
+        // PaP oficial = PaP3
         { key: 'pap', range: parseDateCell(cell(row, cols.pap)) }
       ]
+
+      // Rollback: hay PaP previos revertidos cuando PaP1 Y PaP2 están llenos.
+      // Se marcan ambas fechas (PaP1 y PaP2) con un punto rojo "RB" en el timeline.
+      const pap1Date = parseSingleDate(cell(row, cols.pap1))
+      const pap2Date = parseSingleDate(cell(row, cols.pap2))
+      const rollbacks: Date[] = (pap1Date && pap2Date) ? [pap1Date, pap2Date] : []
 
       // Cada etapa con fecha se convierte en una fase con inicio y fin.
       // Si la celda trae un rango real (inicio distinto de fin) se marca isRange.
@@ -247,8 +280,8 @@ function excelToProjects(rows: RawRow[]): Project[] {
       const pap = cells[3].range
       const papDate = pap.start ?? pap.end ?? null
 
-      // Rango total del proyecto: primera y última fecha entre todas las fases.
-      const allDates = phases.flatMap(ph => [ph.start, ph.end]).sort((a, b) => a.getTime() - b.getTime())
+      // Rango total del proyecto: primera y última fecha entre fases y rollbacks.
+      const allDates = [...phases.flatMap(ph => [ph.start, ph.end]), ...rollbacks].sort((a, b) => a.getTime() - b.getTime())
       const start = allDates[0] ?? null
       const end = allDates[allDates.length - 1] ?? null
 
@@ -268,6 +301,7 @@ function excelToProjects(rows: RawRow[]): Project[] {
         application: text(row, cols.application, '—'),
         status,
         statusLabel: statusRaw || STATUS_LABELS[status],
+        statusJira: optionalText(row, cols.statusJira),
         stage: statusRaw || STATUS_LABELS[status],
         responsible: text(row, cols.responsible, '—'),
         devTeam: optionalText(row, cols.devTeam),
@@ -276,6 +310,7 @@ function excelToProjects(rows: RawRow[]): Project[] {
         start,
         end,
         pap: papDate,
+        rollbacks,
         phases
       }
     })
@@ -315,9 +350,9 @@ function sampleProjects(): Project[] {
     const dates = phases.flatMap(ph => [ph.start, ph.end]).sort((a, b) => a.getTime() - b.getTime())
     return {
       key: id, id, childId: '', name, application, status, statusLabel: STATUS_LABELS[status],
-      stage: STATUS_LABELS[status], responsible, devTeam, components: '—', direction,
+      statusJira: '', stage: STATUS_LABELS[status], responsible, devTeam, components: '—', direction,
       start: dates[0] ?? null, end: dates[dates.length - 1] ?? null,
-      pap: pap ? d(pap.split('|')[0]) : null, phases
+      pap: pap ? d(pap.split('|')[0]) : null, rollbacks: [], phases
     }
   }
   return [
@@ -340,12 +375,20 @@ function timelinePosition(date: Date): number {
 }
 
 type SortMode = 'none' | 'pap-asc' | 'pap-desc'
-// Grupos de estado usados por las tarjetas-filtro (coinciden con los conteos).
-type StatusGroup = 'produccion' | 'piloto' | 'testing' | 'desarrollo' | 'planificado' | 'cancelado'
-type StatusFilter = StatusGroup | 'all'
 const ALL_APPS = '__all__'
 const ALL_RESP = '__all_resp__'
 const ALL_DIR = '__all_dir__'
+
+// Orden en que se muestran los chips-filtro de estado (de más avanzado a backlog).
+const STATUS_ORDER: Status[] = [
+  'produccion', 'piloto', 'testing', 'desarrollo', 'por-aprobar',
+  'planificado', 'refinamiento', 'listo-refinar', 'ean-listo', 'definicion', 'cancelado'
+]
+
+// Clase CSS corta por estado (para color del chip, punto y fila).
+function statusKey(status: Status): string {
+  return status
+}
 
 // Clave de dirección normalizada, para asignar color de forma estable aunque el
 // texto venga con acentos o mayúsculas distintas.
@@ -357,13 +400,7 @@ function directionKey(direction: string): string {
   return d || 'sin'
 }
 
-// Devuelve el grupo de estado al que pertenece un proyecto (planificado agrupa
-// planificado/refinamiento/definición, igual que las tarjetas de estadísticas).
-function statusGroup(status: Status): StatusGroup | 'otros' {
-  if (status === 'produccion' || status === 'piloto' || status === 'testing' || status === 'desarrollo' || status === 'cancelado') return status
-  if (status === 'planificado' || status === 'refinamiento' || status === 'definicion') return 'planificado'
-  return 'otros'
-}
+
 // Excel versionado en el repo (carpeta public/). Para actualizar los datos que
 // ve todo el mundo, reemplaza este archivo y vuelve a desplegar.
 const DEFAULT_FILE = 'matriz_backlog.xlsx'
@@ -371,15 +408,18 @@ const DEFAULT_FILE = 'matriz_backlog.xlsx'
 function App() {
   const [projects, setProjects] = useState<Project[]>(sampleProjects())
   const [fileName, setFileName] = useState('Ejemplo')
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null) // última actualización del Excel
   const [error, setError] = useState('')
   const [appFilter, setAppFilter] = useState<string>(ALL_APPS)
   const [responsibleFilter, setResponsibleFilter] = useState<string>(ALL_RESP)
   const [directionFilter, setDirectionFilter] = useState<string>(ALL_DIR)
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  // Filtro de estado multi-selección: conjunto de estados activos (vacío = todos).
+  const [statusSel, setStatusSel] = useState<Set<Status>>(new Set())
   const [query, setQuery] = useState('') // búsqueda por código/nombre de proyecto
   const [sortMode, setSortMode] = useState<SortMode>('none')
   const [monthWidth, setMonthWidth] = useState(200) // px por mes (zoom del timeline)
   const inputRef = useRef<HTMLInputElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
 
   const MIN_ZOOM = 120, MAX_ZOOM = 420, ZOOM_STEP = 60
   const zoomIn = () => setMonthWidth(w => Math.min(MAX_ZOOM, w + ZOOM_STEP))
@@ -420,7 +460,7 @@ function App() {
   // Proyectos visibles: base + filtro de estado + filtro de dirección + orden.
   const visibleProjects = useMemo(() => {
     let list = baseList.filter(p =>
-      (statusFilter === 'all' || statusGroup(p.status) === statusFilter) &&
+      (statusSel.size === 0 || statusSel.has(p.status)) &&
       (directionFilter === ALL_DIR || p.direction === directionFilter)
     )
     if (sortMode !== 'none') {
@@ -434,22 +474,26 @@ function App() {
       })
     }
     return list
-  }, [baseList, statusFilter, directionFilter, sortMode])
+  }, [baseList, statusSel, directionFilter, sortMode])
 
-  const isDirty = appFilter !== ALL_APPS || responsibleFilter !== ALL_RESP || directionFilter !== ALL_DIR || statusFilter !== 'all' || query.trim() !== '' || sortMode !== 'none' || monthWidth !== 200
+  const isDirty = appFilter !== ALL_APPS || responsibleFilter !== ALL_RESP || directionFilter !== ALL_DIR || statusSel.size > 0 || query.trim() !== '' || sortMode !== 'none' || monthWidth !== 200
   function resetView() {
     setAppFilter(ALL_APPS)
     setResponsibleFilter(ALL_RESP)
     setDirectionFilter(ALL_DIR)
-    setStatusFilter('all')
+    setStatusSel(new Set())
     setQuery('')
     setSortMode('none')
     setMonthWidth(200)
   }
 
-  // Alterna el filtro de estado: click en la tarjeta activa/desactiva el filtro.
-  function toggleStatus(group: StatusFilter) {
-    setStatusFilter(prev => prev === group ? 'all' : group)
+  // Alterna un estado en la selección múltiple (chip): lo añade o lo quita.
+  function toggleStatus(st: Status) {
+    setStatusSel(prev => {
+      const next = new Set(prev)
+      next.has(st) ? next.delete(st) : next.add(st)
+      return next
+    })
   }
   // Alterna el filtro de dirección desde su botón-tarjeta.
   function toggleDirection(dir: string) {
@@ -463,27 +507,36 @@ function App() {
   const todayInRange = todayRaw >= 0 && todayRaw <= MONTH_COUNT
   const todayPct = (todayRaw / MONTH_COUNT) * 100
 
-  // Conteos por estado: sobre la base + filtro de dirección (pero sin el propio
-  // filtro de estado), para que las tarjetas muestren los totales de ese contexto.
-  const stats = useMemo(() => {
+  // Conteo total sobre la base + filtro de dirección (sin el filtro de estado).
+  const totalCount = useMemo(
+    () => (directionFilter === ALL_DIR ? baseList : baseList.filter(p => p.direction === directionFilter)).length,
+    [baseList, directionFilter]
+  )
+
+  // Chips de estado: solo los estados realmente presentes, con su conteo (sobre
+  // la base + filtro de dirección, sin el propio filtro de estado).
+  const statusChips = useMemo(() => {
     const list = directionFilter === ALL_DIR ? baseList : baseList.filter(p => p.direction === directionFilter)
-    return {
-      total: list.length,
-      produccion: list.filter(p => p.status === 'produccion').length,
-      piloto: list.filter(p => p.status === 'piloto').length,
-      testing: list.filter(p => p.status === 'testing').length,
-      desarrollo: list.filter(p => p.status === 'desarrollo').length,
-      planificado: list.filter(p => statusGroup(p.status) === 'planificado').length,
-      cancelado: list.filter(p => p.status === 'cancelado').length
-    }
+    return STATUS_ORDER
+      .map(st => ({ status: st, label: STATUS_LABELS[st], count: list.filter(p => p.status === st).length }))
+      .filter(c => c.count > 0)
   }, [baseList, directionFilter])
+
+  // Lista de estados realmente presentes (en orden), para el botón "Todos".
+  const presentStatuses = useMemo(() => statusChips.map(c => c.status), [statusChips])
+  // "Todos" está activo cuando están seleccionados todos los estados presentes.
+  const allStatusesActive = presentStatuses.length > 0 && presentStatuses.every(st => statusSel.has(st))
+  // Marca/desmarca todos los estados presentes de una vez.
+  function selectAllStatuses() {
+    setStatusSel(allStatusesActive ? new Set() : new Set(presentStatuses))
+  }
 
   // Conteos por dirección: sobre la base + filtro de estado (sin el propio filtro
   // de dirección). Cada entrada alimenta un botón-tarjeta de dirección.
   const dirStats = useMemo(() => {
-    const list = statusFilter === 'all' ? baseList : baseList.filter(p => statusGroup(p.status) === statusFilter)
+    const list = statusSel.size === 0 ? baseList : baseList.filter(p => statusSel.has(p.status))
     return directions.map(d => ({ name: d, count: list.filter(p => p.direction === d).length }))
-  }, [baseList, statusFilter, directions])
+  }, [baseList, statusSel, directions])
 
   async function handleFile(file: File) {
     setError('')
@@ -491,6 +544,8 @@ function App() {
       const parsed = projectsFromBuffer(await file.arrayBuffer())
       setProjects(parsed)
       setFileName(file.name)
+      // Para carga manual: fecha de última modificación del archivo elegido.
+      setUpdatedAt(file.lastModified ? new Date(file.lastModified) : new Date())
       resetView()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo procesar el Excel.')
@@ -506,10 +561,13 @@ function App() {
         const url = `${import.meta.env.BASE_URL}${DEFAULT_FILE}`
         const res = await fetch(url)
         if (!res.ok) throw new Error(`No se pudo leer ${DEFAULT_FILE} (HTTP ${res.status}).`)
+        // Fecha de última actualización = Last-Modified del archivo en el servidor.
+        const lastMod = res.headers.get('Last-Modified')
         const parsed = projectsFromBuffer(await res.arrayBuffer())
         if (!cancelled) {
           setProjects(parsed)
           setFileName(DEFAULT_FILE)
+          setUpdatedAt(lastMod ? new Date(lastMod) : null)
         }
       } catch {
         // Si no existe el archivo del repo, se mantienen los datos de ejemplo.
@@ -520,9 +578,25 @@ function App() {
     return () => { cancelled = true }
   }, [])
 
+  // Desplaza el timeline hasta Septiembre por defecto (sin perder jun-ago, que
+  // siguen accesibles al scrollear a la izquierda). Se reajusta con el zoom y
+  // cuando cambian los datos cargados.
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    // Lleva el inicio de Septiembre justo tras la columna Proyecto (sticky).
+    // scrollLeft = ancho(Aplicación) + mesesDesdeJunio * anchoMes
+    const styles = getComputedStyle(el.querySelector('.roadmap-inner') as HTMLElement)
+    const left2 = parseFloat(styles.getPropertyValue('--left2')) || 0
+    const monthOffset = DEFAULT_SCROLL_MONTH - FIRST_MONTH // 3 meses desde junio
+    const left = left2 + monthOffset * monthWidth
+    el.scrollTo({ left, behavior: 'auto' })
+  }, [monthWidth, fileName])
+
   const statusIcon: Record<Status, string> = {
-    produccion: '✓', piloto: '✈', testing: '⚑', desarrollo: '▣', planificado: '◷',
-    refinamiento: '◔', definicion: '○', cancelado: '×', 'sin-estado': '—'
+    produccion: '✓', piloto: '✈', testing: '⚑', desarrollo: '▣', 'por-aprobar': '⏸',
+    planificado: '◷', refinamiento: '◔', 'listo-refinar': '◔', 'ean-listo': '◳',
+    definicion: '○', cancelado: '×', 'sin-estado': '—'
   }
 
   return (
@@ -537,7 +611,15 @@ function App() {
       </header>
 
       <section className="toolbar">
-        <div className="file-pill">Datos: <strong>{fileName}</strong></div>
+        <div className="file-pill">
+          Datos: <strong>{fileName}</strong>
+          {updatedAt && (
+            <span className="updated-at">
+              Actualizado al {updatedAt.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+              {' '}{updatedAt.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          )}
+        </div>
 
         <label className="control search">
           <span>Buscar proyecto</span>
@@ -594,14 +676,30 @@ function App() {
 
       {error && <div className="error">{error}</div>}
 
-      <section className="stats">
-        <Stat value={stats.total} label="Proyectos totales" icon="▥" active={statusFilter === 'all'} onClick={() => setStatusFilter('all')} />
-        <Stat value={stats.produccion} label="Producción" icon="✓" status="produccion" active={statusFilter === 'produccion'} onClick={() => toggleStatus('produccion')} />
-        <Stat value={stats.piloto} label="Piloto" icon="✈" status="piloto" active={statusFilter === 'piloto'} onClick={() => toggleStatus('piloto')} />
-        <Stat value={stats.testing} label="Testing" icon="⚑" status="testing" active={statusFilter === 'testing'} onClick={() => toggleStatus('testing')} />
-        <Stat value={stats.desarrollo} label="Desarrollo" icon="▣" status="desarrollo" active={statusFilter === 'desarrollo'} onClick={() => toggleStatus('desarrollo')} />
-        <Stat value={stats.planificado} label="Planificado / Backlog" icon="◷" status="planificado" active={statusFilter === 'planificado'} onClick={() => toggleStatus('planificado')} />
-        <Stat value={stats.cancelado} label="Cancelado" icon="×" status="cancelado" active={statusFilter === 'cancelado'} onClick={() => toggleStatus('cancelado')} />
+      <section className="status-filters">
+        <div className="total-chip" title="Total de proyectos">
+          <b>{totalCount}</b> Proyectos
+        </div>
+        <button
+          type="button"
+          className={`chip chip-all${allStatusesActive ? ' active' : ''}`}
+          onClick={selectAllStatuses}
+        >
+          Todos
+        </button>
+        {statusChips.map(c => (
+          <button
+            key={c.status}
+            type="button"
+            className={`chip chip-${statusKey(c.status)}${statusSel.has(c.status) ? ' active' : ''}`}
+            onClick={() => toggleStatus(c.status)}
+            aria-pressed={statusSel.has(c.status)}
+          >
+            <span className="chip-dot" />
+            {c.label}
+            <span className="chip-count">{c.count}</span>
+          </button>
+        ))}
       </section>
 
       {directions.length > 0 && (
@@ -628,11 +726,11 @@ function App() {
       )}
 
       <main className="roadmap-card" style={{ '--month-w': `${monthWidth}px` } as React.CSSProperties}>
-        <div className="roadmap-scroll">
+        <div className="roadmap-scroll" ref={scrollRef}>
           <div className="roadmap-inner">
             <div className="grid header-row">
               <div>Proyecto</div><div>Aplicación</div><div className="timeline-head"><div className="year">2026</div><div className="months">{MONTHS.map(m => <span key={m}>{m}</span>)}</div></div>
-              <div>Estado</div><div>Responsable</div><div>Componentes</div>
+              <div>Estado</div><div>Estado Jira</div><div>Responsable</div><div>Componentes</div>
             </div>
 
             {todayInRange && visibleProjects.length > 0 && (
@@ -648,49 +746,26 @@ function App() {
             {visibleProjects.length
               ? visibleProjects.map(p => <RoadmapRow key={p.key} p={p} statusIcon={statusIcon[p.status]} />)
               : <div className="empty">No hay proyectos que coincidan con los filtros.</div>}
-
-            <div className="legend">
-              <strong>ETAPAS</strong>
-              <span className="legend-item"><i className="seg phase-refinamiento" /> Refinamiento</span>
-              <span className="legend-item"><i className="seg phase-desarrollo" /> Desarrollo</span>
-              <span className="legend-item"><i className="seg phase-testing" /> Testing</span>
-              <span className="legend-item"><i className="seg phase-pap" /> PaP</span>
-              <span className="legend-sep" />
-              <strong>ESTADO</strong>
-              <span className="legend-item"><i className="dot produccion">✓</i> Producción</span>
-              <span className="legend-item"><i className="dot piloto">✈</i> Piloto</span>
-              <span className="legend-item"><i className="dot testing">⚑</i> Testing</span>
-              <span className="legend-item"><i className="dot desarrollo">▣</i> Desarrollo</span>
-              <span className="legend-item"><i className="dot planificado">◷</i> Planificado</span>
-              <span className="legend-item"><i className="dot cancelado">×</i> Cancelado</span>
-              <span className="legend-sep" />
-              <strong>DIRECCIÓN</strong>
-              <span className="legend-item"><i className="dir-chip dir-regulatorio">Regulatorio</i></span>
-              <span className="legend-item"><i className="dir-chip dir-negocio">Negocio</i></span>
-              <span className="legend-item"><i className="dir-chip dir-tecnologia">Tecnología</i></span>
-            </div>
           </div>
+        </div>
+
+        {/* Leyenda fuera del scroll: informativa y fija, no se desplaza. */}
+        <div className="legend">
+          <strong>ETAPAS</strong>
+          <span className="legend-item"><i className="seg phase-refinamiento" /> Refinamiento</span>
+          <span className="legend-item"><i className="seg phase-desarrollo" /> Desarrollo</span>
+          <span className="legend-item"><i className="seg phase-testing" /> Testing</span>
+          <span className="legend-item"><i className="seg phase-pap" /> PaP</span>
+          <span className="legend-sep" />
+          <span className="legend-item"><i className="rb-dot-legend" /> RB = Rollback (PaP revertido)</span>
+          <span className="legend-sep" />
+          <strong>DIRECCIÓN</strong>
+          <span className="legend-item"><i className="dir-chip dir-regulatorio">Regulatorio</i></span>
+          <span className="legend-item"><i className="dir-chip dir-negocio">Negocio</i></span>
+          <span className="legend-item"><i className="dir-chip dir-tecnologia">Tecnología</i></span>
         </div>
       </main>
     </div>
-  )
-}
-
-function Stat({ value, label, icon, status, active, onClick }: {
-  value: number, label: string, icon: string,
-  status?: StatusGroup, active?: boolean, onClick?: () => void
-}) {
-  return (
-    <button
-      type="button"
-      className={`stat${status ? ` stat-${status}` : ''}${active ? ' active' : ''}`}
-      onClick={onClick}
-      aria-pressed={active}
-      title={status ? `Filtrar por ${label}` : 'Mostrar todos'}
-    >
-      <i>{icon}</i>
-      <div><b>{value}</b><span>{label}</span></div>
-    </button>
   )
 }
 
@@ -713,7 +788,12 @@ function RoadmapRow({ p, statusIcon }: { p: Project, statusIcon:string }) {
       return { ...ph, i, x1, x2, lane: i % 2 }
     })
 
-  return <div className="grid data-row">
+  // Modificadores visuales de fila: cancelado se atenúa a gris; por aprobar se
+  // atenúa parcialmente para señalar que no puede avanzar.
+  const rowMod = p.status === 'cancelado' ? ' row-cancelado'
+    : p.status === 'por-aprobar' ? ' row-por-aprobar' : ''
+
+  return <div className={`grid data-row${rowMod}`}>
     <div className="project-cell">
       <div className="project-ids">
         <b>{p.id}</b>
@@ -731,6 +811,17 @@ function RoadmapRow({ p, statusIcon }: { p: Project, statusIcon:string }) {
       {p.start && p.end
         ? <div className="bar-base" style={{left:`${left}%`, width:`${width}%`}} />
         : <div className="dash" />}
+      {/* Marcadores de rollback (RB): PaP previos revertidos (PaP1, PaP2), en rojo. */}
+      {p.rollbacks.map((rb, i) => {
+        const x = timelinePosition(rb) * 100
+        return (
+          <div className="rollback" key={`rb-${i}`} style={{left:`${x}%`}} title={`Rollback PaP${i + 1}: ${formatDate(rb)}`}>
+            <em className="rb-date">{formatDate(rb)}</em>
+            <span className="rb-dot" />
+            <small className="rb-flag">RB</small>
+          </div>
+        )
+      })}
       {placed.map(ph => {
         // Rango: segmento con ancho real. Punto (p.ej. PaP): ancho 0 -> un solo círculo.
         const w = ph.isRange ? Math.max(0.6, ph.x2 - ph.x1) : 0
@@ -745,6 +836,7 @@ function RoadmapRow({ p, statusIcon }: { p: Project, statusIcon:string }) {
       })}
     </div>
     <div className={`status ${p.status}`} title={p.statusLabel}><i>{statusIcon}</i><span>{p.statusLabel}</span></div>
+    <div className="status-jira">{p.statusJira || '—'}</div>
     <div className="responsible">{p.responsible}</div>
     <div className="components">{p.components}</div>
   </div>

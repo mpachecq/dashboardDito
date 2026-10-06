@@ -8,6 +8,7 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#1838
 .upload:hover{background:#0f2c5c}
 .toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:16px;margin:15px 0}
 .file-pill{background:#f3f6fa;border:1px solid #dce4ee;border-radius:7px;padding:8px 12px;color:#50627c}
+.file-pill .updated-at{display:block;font-size:11px;color:#8a93a3;margin-top:2px}
 .hint{font-size:12px;color:#748198}
 .control{display:flex;flex-direction:column;gap:3px;font-size:11px;color:#6c7890;font-weight:700}
 .control select{font-size:13px;font-weight:400;color:#18386e;padding:7px 10px;border:1px solid #cdd8e8;border-radius:7px;background:#fff;cursor:pointer;min-width:170px}
@@ -28,30 +29,33 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#1838
 .empty{padding:26px;text-align:center;color:#748198;font-size:14px}
 .error{background:#fff0f0;border:1px solid #f4b5b5;color:#a51d1d;padding:10px 13px;border-radius:7px;margin-bottom:12px}
 
-.stats{display:grid;grid-template-columns:repeat(7,1fr);border:1px solid #c8d5e7;border-radius:17px;overflow:hidden;margin-bottom:24px}
-/* Cada tarjeta es un botón-filtro por estado. */
-.stat{display:flex;align-items:center;gap:11px;padding:15px 14px;border:0;border-right:1px solid #d9e1ec;background:#fff;font:inherit;text-align:left;cursor:pointer;position:relative;transition:background .12s}
-.stat:last-child{border-right:0}
-.stat:hover{background:#f3f7fc}
-.stat.active{background:#eef4fc}
-/* Barra superior de color que marca la tarjeta activa. */
-.stat.active:before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:#173b78}
-.stat.active.stat-produccion:before{background:#4ca942}
-.stat.active.stat-piloto:before{background:#6b4fd1}
-.stat.active.stat-testing:before{background:#1d6fc1}
-.stat.active.stat-desarrollo:before{background:#f5a900}
-.stat.active.stat-planificado:before{background:#8a93a3}
-.stat.active.stat-cancelado:before{background:#eb252c}
-.stat i{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-style:normal;background:#173b78;color:#fff;font-weight:800;font-size:18px;flex:none}
-.stat b{display:block;font-size:22px;color:#18386e;line-height:1.1}
-.stat span{font-size:11px;color:#294b80}
-/* Color del icono por estado (robusto ante nuevos estados/orden). */
-.stat.stat-produccion i{background:#4ca942}
-.stat.stat-piloto i{background:#6b4fd1}
-.stat.stat-testing i{background:#1d6fc1}
-.stat.stat-desarrollo i{background:#f5a900}
-.stat.stat-planificado i{background:#8a93a3}
-.stat.stat-cancelado i{background:#eb252c}
+/* Colores por estado (reutilizados en chips, punto de la columna Estado y leyenda). */
+.chip-produccion,.dot.produccion,.status.produccion i{--sc:#4ca942}
+.chip-piloto,.dot.piloto,.status.piloto i{--sc:#6b4fd1}
+.chip-testing,.dot.testing,.status.testing i{--sc:#1d6fc1}
+.chip-desarrollo,.dot.desarrollo,.status.desarrollo i{--sc:#f5a900}
+.chip-por-aprobar,.status.por-aprobar i{--sc:#d98324}
+.chip-planificado,.dot.planificado,.status.planificado i{--sc:#8a93a3}
+.chip-refinamiento,.status.refinamiento i{--sc:#a4abb8}
+.chip-listo-refinar,.status.listo-refinar i{--sc:#7d8aa0}
+.chip-ean-listo,.status.ean-listo i{--sc:#4a7fa5}
+.chip-definicion,.status.definicion i{--sc:#c1c7d1}
+.chip-cancelado,.dot.cancelado,.status.cancelado i{--sc:#9aa3af}
+.chip-sin-estado,.status.sin-estado i{--sc:#c1c7d1}
+
+/* Filtros de estado tipo "tienda": chips pequeños multi-selección. */
+.status-filters{display:flex;align-items:center;flex-wrap:wrap;gap:9px;margin-bottom:20px}
+.total-chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#42557a;background:#eef2f8;border-radius:20px;padding:6px 14px}
+.total-chip b{font-size:15px;font-weight:800;color:#18386e}
+.chip{--sc:#173b78;display:inline-flex;align-items:center;gap:7px;border:1.5px solid #d3dbe7;background:#fff;color:#3a4a63;font:inherit;font-size:12px;font-weight:600;padding:6px 12px;border-radius:20px;cursor:pointer;transition:all .12s}
+.chip .chip-dot{width:9px;height:9px;border-radius:50%;background:var(--sc);flex:none}
+.chip .chip-count{font-size:11px;font-weight:800;color:#8a93a3;background:#f0f3f8;border-radius:10px;padding:0 7px;margin-left:1px}
+.chip:hover{border-color:var(--sc)}
+.chip.active{border-color:var(--sc);background:var(--sc);color:#fff}
+.chip.active .chip-dot{background:#fff}
+.chip.active .chip-count{background:rgba(255,255,255,.25);color:#fff}
+.chip.chip-all{font-weight:700}
+.chip.chip-all.active{background:#173b78;border-color:#173b78;color:#fff}
 
 /* Filtros de dirección: botones-pill con conteo, en el hueco bajo las tarjetas. */
 .dir-filters{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:-8px 0 22px}
@@ -73,20 +77,23 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#1838
    "acercar" o "alejar" el zoom del roadmap. */
 .roadmap-card{--month-w:200px;--months:7;--timeline-w:calc(var(--month-w) * var(--months));
   /* columnas laterales fijas */
-  --left1:360px;--left2:85px;--r1:110px;--r2:130px;--r3:170px}
+  --left1:360px;--left2:85px;--r1:110px;--rjira:120px;--r2:130px;--r3:170px}
 /* El scroll horizontal vive solo en la tabla, no en toda la página. */
 .roadmap-scroll{overflow-x:auto;overflow-y:hidden}
 /* Ancho total = laterales + timeline, para alinear encabezado y filas al scroll. */
-.roadmap-inner{position:relative;width:calc(var(--left1) + var(--left2) + var(--timeline-w) + var(--r1) + var(--r2) + var(--r3))}
+.roadmap-inner{position:relative;width:calc(var(--left1) + var(--left2) + var(--timeline-w) + var(--r1) + var(--rjira) + var(--r2) + var(--r3))}
 
 /* Línea vertical de "hoy": sutil pero visible, cruza todas las filas del
    timeline desde debajo del encabezado (59px) hasta el borde de la leyenda. */
 .today-line{position:absolute;top:59px;bottom:0;width:0;border-left:2px dashed rgba(232,102,58,.4);z-index:4;pointer-events:none}
 .today-line .today-label{position:absolute;top:2px;left:50%;transform:translateX(-50%);background:#e8663a;color:#fff;font-size:9px;font-weight:700;letter-spacing:.3px;padding:1px 6px;border-radius:0 0 6px 6px;white-space:nowrap}
-.grid{display:grid;grid-template-columns:var(--left1) var(--left2) var(--timeline-w) var(--r1) var(--r2) var(--r3)}
+.grid{display:grid;grid-template-columns:var(--left1) var(--left2) var(--timeline-w) var(--r1) var(--rjira) var(--r2) var(--r3)}
 .grid>div:last-child{border-right:0}
 .header-row{background:#123675;color:white;font-weight:700;font-size:13px;min-height:59px}
 .header-row>div{padding:12px 10px;border-right:1px solid #6f86ad;display:flex;align-items:center;justify-content:center}
+/* Columna Proyecto fija al hacer scroll horizontal, para no perder de vista
+   a qué proyecto pertenece cada fila cuando el timeline se desplaza. */
+.header-row>div:first-child{position:sticky;left:0;z-index:6;background:#123675}
 .timeline-head{padding:0!important;display:block!important}
 .year{height:27px;text-align:center;padding-top:7px}
 .months{display:grid;grid-template-columns:repeat(var(--months),1fr);height:32px}
@@ -95,7 +102,10 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#1838
 .data-row{min-height:88px;border-bottom:1px solid #dbe2ec;background:#fff;font-size:12px}
 .data-row:nth-child(even){background:#fafcff}
 .data-row>div{border-right:1px solid #e1e7ef}
-.project-cell{display:flex;flex-direction:column;justify-content:center;gap:3px;padding:8px 12px}
+/* La celda Proyecto queda fija a la izquierda (sticky) con fondo propio y una
+   línea/sombra sutil que la separa del timeline al scrollear. */
+.project-cell{position:sticky;left:0;z-index:8;display:flex;flex-direction:column;justify-content:center;gap:3px;padding:8px 12px;background:#fff;box-shadow:1px 0 0 #dbe2ec}
+.data-row:nth-child(even) .project-cell{background:#fafcff}
 /* Códigos padre/hijo: el padre destaca, el hijo va debajo, más pequeño y tenue. */
 .project-ids{display:flex;flex-direction:column;line-height:1.1}
 .project-ids b{font-size:13px;color:#123675}
@@ -111,8 +121,9 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#1838
 .dir-negocio{background:#e8f1fd;color:#1f5fb0}
 .dir-tecnologia{background:#eaf6ec;color:#2f8a3c}
 .dir-sin{background:#eef0f3;color:#6b7688}
-.app-cell,.status,.responsible,.components,.direction{display:flex;align-items:center;justify-content:center;padding:8px 10px;text-align:center}
+.app-cell,.status,.status-jira,.responsible,.components,.direction{display:flex;align-items:center;justify-content:center;padding:8px 10px;text-align:center}
 .responsible,.direction{font-weight:600;color:#2b4874}
+.status-jira{font-size:11px;font-weight:600;color:#5a6b88;white-space:normal;line-height:1.3}
 /* Componentes puede tener textos largos: permitir salto de línea sin cortar. */
 .components{font-weight:500;color:#5a6b88;font-size:11px;white-space:normal;overflow-wrap:anywhere;line-height:1.3}
 
@@ -157,17 +168,8 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#1838
 .phase-pap{color:#4ca942}
 
 .status{flex-direction:column;gap:3px}
-.status i{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;color:#fff;font-style:normal;font-weight:900;font-size:12px}
+.status i{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;color:#fff;font-style:normal;font-weight:900;font-size:12px;background:var(--sc,#c1c7d1)}
 .status span{font-size:10px;font-weight:700;color:#3a557f}
-.status.produccion i{background:#4ca942}
-.status.piloto i{background:#6b4fd1}
-.status.testing i{background:#1d6fc1}
-.status.desarrollo i{background:#f5a900}
-.status.planificado i{background:#8a93a3}
-.status.refinamiento i{background:#a4abb8}
-.status.definicion i{background:#c1c7d1}
-.status.cancelado i{background:#ed2224}
-.status.sin-estado i{background:#c1c7d1}
 
 .legend{position:relative;z-index:5;display:flex;align-items:center;flex-wrap:wrap;gap:18px;padding:12px 22px;background:#f9fafc;border-top:1px solid #dbe2ec;font-size:12px}
 .legend strong{font-size:13px;margin-right:6px;color:#42557a}
@@ -188,7 +190,38 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#1838
 .dot.definicion{background:#c1c7d1}
 .dot.cancelado{background:#ed2224}
 
-/* En pantallas angostas, las tarjetas de estadísticas se reacomodan en 3/2 columnas
-   y la tabla scrollea horizontalmente por sí sola (.roadmap-scroll). */
-@media(max-width:1100px){.stats{grid-template-columns:repeat(3,1fr)}.stat:nth-child(3n) {border-right:0}}
-@media(max-width:640px){.stats{grid-template-columns:repeat(2,1fr)}.stat{border-right:1px solid #d9e1ec}}
+/* Marcador de rollback (RB): PaP previo revertido. Punto rojo pequeño con flag,
+   sobre la línea base, discreto para no competir con las fases. */
+.rollback{position:absolute;top:24px;transform:translateX(-50%);z-index:3;pointer-events:none;text-align:center}
+.rollback .rb-date{display:block;font-style:normal;font-size:8px;font-weight:700;color:#e23b3b;white-space:nowrap;margin-bottom:1px}
+.rollback .rb-dot{display:block;width:9px;height:9px;border-radius:50%;background:#e23b3b;border:2px solid #fff;box-shadow:0 0 0 1px #e23b3b;margin:0 auto}
+.rollback .rb-flag{display:block;font-size:7px;font-weight:800;color:#e23b3b;letter-spacing:.4px;margin-top:1px}
+.rb-dot-legend{width:11px;height:11px;border-radius:50%;background:#e23b3b;border:2px solid #fff;box-shadow:0 0 0 1px #e23b3b;display:inline-block}
+
+/* Filas atenuadas (cancelado / por aprobar): señalan baja relevancia.
+   IMPORTANTE: la atenuación (opacity/filter) se aplica SOLO al contenido, no a la
+   fila completa, para que el fondo de la columna Proyecto siga opaco y oculte la
+   línea de "hoy" al pasar por detrás (si se usa opacity en la fila, el fondo se
+   vuelve translúcido y la línea se ve a través). */
+
+/* Cancelado: contenido en gris. El fondo de las celdas permanece opaco. */
+.data-row.row-cancelado .project-cell > *,
+.data-row.row-cancelado .app-cell,
+.data-row.row-cancelado .timeline,
+.data-row.row-cancelado .status,
+.data-row.row-cancelado .status-jira,
+.data-row.row-cancelado .responsible,
+.data-row.row-cancelado .components{filter:grayscale(1);opacity:.5}
+.data-row.row-cancelado .project-ids b,
+.data-row.row-cancelado .project-cell span{color:#8a93a3}
+
+/* Por aprobar: contenido atenuado y desaturado (no puede avanzar). */
+.data-row.row-por-aprobar .project-cell > *,
+.data-row.row-por-aprobar .app-cell,
+.data-row.row-por-aprobar .timeline,
+.data-row.row-por-aprobar .status,
+.data-row.row-por-aprobar .status-jira,
+.data-row.row-por-aprobar .responsible,
+.data-row.row-por-aprobar .components{filter:grayscale(.65);opacity:.5}
+
+/* Los chips de estado hacen wrap solos; sin reglas especiales en móvil. */
