@@ -60,6 +60,8 @@ El navegador **no puede** llamar a la API de Jira directamente por dos motivos:
 
 Por eso hay una **Azure Function** (`api/jira-status`) que actúa de intermediario: el navegador le pide los estados, y la función (con el token guardado de forma segura en variables de entorno del servidor) consulta Jira y devuelve solo los estados. Como vive en la misma Static Web App, se accede en `/api/jira-status` sin problemas de CORS.
 
+La función usa el endpoint vigente de Jira Cloud `POST /rest/api/3/search/jql` (el antiguo `/rest/api/3/search` fue retirado por Atlassian y devuelve `410 Gone`).
+
 ### Cómo mapea los códigos
 
 - Usa el **código padre** (`PROI-xxx`, primera línea de la columna Proyecto) como *issue key* de Jira.

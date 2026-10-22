@@ -54,38 +54,44 @@ app.http('jira-status', {
     const auth = Buffer.from(`${email}:${token}`).toString('base64')
 
     // Consultamos con JQL (key in (...)) y pedimos solo el campo status.
-    // Es una sola llamada aunque sean muchos issues.
+    // Endpoint actual de Jira Cloud: /rest/api/3/search/jql (el antiguo
+    // /rest/api/3/search fue retirado y devuelve 410 Gone).
     const jql = `key in (${keys.map(k => `"${k}"`).join(',')})`
-    const searchUrl = `${baseUrl.replace(/\/$/, '')}/rest/api/3/search`
+    const searchUrl = `${baseUrl.replace(/\/$/, '')}/rest/api/3/search/jql`
 
     try {
-      const res = await fetch(searchUrl, {
-        method: 'POST',
-        headers: {
-          Authorization: `Basic ${auth}`,
-          Accept: 'application/json',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          jql,
-          fields: ['status'],
-          maxResults: MAX_KEYS
-        })
-      })
-
-      if (!res.ok) {
-        const detail = await safeText(res)
-        context.error(`Jira respondió ${res.status}: ${detail}`)
-        return json(res.status === 401 || res.status === 403 ? 502 : 502, {
-          error: `Jira respondió con error ${res.status}. Revisa las credenciales y la URL base.`
-        })
-      }
-
-      const data = await res.json()
       const statuses = {}
-      for (const issue of data.issues ?? []) {
-        statuses[issue.key] = issue.fields?.status?.name ?? ''
-      }
+      // El endpoint /search/jql pagina con nextPageToken. Recorremos todas las
+      // páginas (para tu volumen basta una, pero así escala sin tocar nada).
+      let nextPageToken // undefined en la primera página
+      do {
+        const body = { jql, fields: ['status'], maxResults: MAX_KEYS }
+        if (nextPageToken) body.nextPageToken = nextPageToken
+
+        const res = await fetch(searchUrl, {
+          method: 'POST',
+          headers: {
+            Authorization: `Basic ${auth}`,
+            Accept: 'application/json',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(body)
+        })
+
+        if (!res.ok) {
+          const detail = await safeText(res)
+          context.error(`Jira respondió ${res.status}: ${detail}`)
+          return json(502, {
+            error: `Jira respondió con error ${res.status}. Revisa las credenciales y la URL base.`
+          })
+        }
+
+        const data = await res.json()
+        for (const issue of data.issues ?? []) {
+          statuses[issue.key] = issue.fields?.status?.name ?? ''
+        }
+        nextPageToken = data.nextPageToken
+      } while (nextPageToken)
 
       // Qué keys pedidos no volvieron (no existen o sin permiso de lectura).
       const notFound = keys.filter(k => !(k in statuses))
