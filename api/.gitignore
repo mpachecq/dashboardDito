@@ -1,0 +1,4 @@
+# Nunca subir credenciales reales ni dependencias
+local.settings.json
+node_modules/
+dist/

@@ -421,6 +421,9 @@ function App() {
   const [statusSel, setStatusSel] = useState<Set<Status>>(new Set())
   const [query, setQuery] = useState('') // búsqueda por código/nombre de proyecto
   const [sortMode, setSortMode] = useState<SortMode>('none')
+  // Estado de la sincronización con Jira (vía la Azure Function /api/jira-status).
+  const [jiraSyncing, setJiraSyncing] = useState(false)
+  const [jiraMsg, setJiraMsg] = useState('') // mensaje de resultado de la última sync
   const [monthWidth, setMonthWidth] = useState(200) // px por mes (zoom del timeline)
   const inputRef = useRef<HTMLInputElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -556,6 +559,68 @@ function App() {
     }
   }
 
+  // Sincroniza la columna "Estado Jira" con los estados reales de Jira.
+  // Llama a la Azure Function /api/jira-status (que es la que habla con Jira de
+  // forma segura: el token vive en el servidor, nunca en el navegador).
+  // Usa el código padre (p.id) como issue key; si existe un código hijo (p.childId)
+  // también se consulta, y su estado tiene prioridad para esa fila.
+  async function syncWithJira() {
+    setJiraMsg('')
+    setError('')
+    setJiraSyncing(true)
+    try {
+      // Reúne el issue key relevante por fila: el hijo si existe, si no el padre.
+      // Es el mismo criterio con el que luego se rellena la columna Estado Jira,
+      // así no consultamos códigos que no vamos a usar.
+      const keys = Array.from(
+        new Set(
+          projects
+            .map(p => (p.childId || p.id).trim())
+            .filter(Boolean)
+        )
+      )
+      if (keys.length === 0) {
+        setJiraMsg('No hay códigos de proyecto para consultar en Jira.')
+        return
+      }
+
+      const res = await fetch(`/api/jira-status?keys=${encodeURIComponent(keys.join(','))}`)
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(data?.error || `El servidor respondió con error ${res.status}.`)
+      }
+
+      const statuses: Record<string, string> = data.statuses ?? {}
+      // Actualiza la columna "Estado Jira" (statusJira) de cada proyecto.
+      // Regla: si la fila tiene código hijo, el estado mostrado es SIEMPRE el del
+      // hijo (si Jira no lo devuelve, queda vacío; NO se cae al padre). Si no hay
+      // hijo, se usa el del único código presente (el padre). Vacío si no responde.
+      let updated = 0
+      setProjects(prev =>
+        prev.map(p => {
+          const key = p.childId || p.id          // el hijo manda cuando existe
+          const next = statuses[key] ?? ''        // vacío si Jira no lo devolvió
+          if (next !== p.statusJira) {
+            updated++
+            return { ...p, statusJira: next }
+          }
+          return p
+        })
+      )
+
+      const notFound: string[] = data.notFound ?? []
+      const parts = [`Jira sincronizado: ${updated} proyecto(s) actualizado(s).`]
+      if (notFound.length) {
+        parts.push(`${notFound.length} código(s) no encontrados en Jira: ${notFound.slice(0, 5).join(', ')}${notFound.length > 5 ? '…' : ''}.`)
+      }
+      setJiraMsg(parts.join(' '))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo sincronizar con Jira.')
+    } finally {
+      setJiraSyncing(false)
+    }
+  }
+
   // Al iniciar, carga automáticamente el Excel incluido en el repositorio
   // (public/matriz.xlsx) para que todos vean los mismos datos sin subir nada.
   useEffect(() => {
@@ -610,7 +675,12 @@ function App() {
           <h1>ROADMAP PROYECTOS Y REQUERIMIENTOS</h1>
           <p>Generador automático desde Excel</p>
         </div>
-        <button className="upload" onClick={() => inputRef.current?.click()}>Cargar Excel</button>
+        <div className="header-actions">
+          <button className="upload" onClick={() => inputRef.current?.click()}>Cargar Excel</button>
+          <button className="sync-jira" onClick={syncWithJira} disabled={jiraSyncing}>
+            {jiraSyncing ? 'Sincronizando…' : 'Sincronizar con Jira'}
+          </button>
+        </div>
         <input ref={inputRef} hidden type="file" accept=".xlsx,.xls,.csv" onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])} />
       </header>
 
@@ -679,6 +749,7 @@ function App() {
       </section>
 
       {error && <div className="error">{error}</div>}
+      {jiraMsg && <div className="jira-msg">{jiraMsg}</div>}
 
       <section className="status-filters">
         <div className="total-chip" title="Total de proyectos">

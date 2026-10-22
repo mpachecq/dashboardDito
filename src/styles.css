@@ -4,8 +4,12 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#1838
 .topbar{display:flex;align-items:center;gap:24px;border-bottom:1px solid #e1e7ef;padding:0 8px 18px}
 .topbar h1{margin:0;font-size:27px;letter-spacing:.2px;color:#173b78}
 .topbar p{margin:5px 0 0;color:#6c7890}
-.upload{margin-left:auto;border:0;border-radius:9px;background:#173b78;color:#fff;font-weight:700;padding:12px 20px;cursor:pointer;box-shadow:0 3px 8px #173b7830}
+.header-actions{margin-left:auto;display:flex;gap:10px;align-items:center}
+.upload{border:0;border-radius:9px;background:#173b78;color:#fff;font-weight:700;padding:12px 20px;cursor:pointer;box-shadow:0 3px 8px #173b7830}
 .upload:hover{background:#0f2c5c}
+.sync-jira{border:0;border-radius:9px;background:#0052cc;color:#fff;font-weight:700;padding:12px 20px;cursor:pointer;box-shadow:0 3px 8px #0052cc30}
+.sync-jira:hover{background:#003d99}
+.sync-jira:disabled{background:#8aa9d6;cursor:default;box-shadow:none}
 .toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:16px;margin:15px 0}
 .file-pill{background:#f3f6fa;border:1px solid #dce4ee;border-radius:7px;padding:8px 12px;color:#50627c}
 .file-pill .updated-at{display:block;font-size:11px;color:#8a93a3;margin-top:2px}
@@ -28,6 +32,7 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#1838
 .count{margin-left:auto;font-size:12px;color:#748198;font-weight:600}
 .empty{padding:26px;text-align:center;color:#748198;font-size:14px}
 .error{background:#fff0f0;border:1px solid #f4b5b5;color:#a51d1d;padding:10px 13px;border-radius:7px;margin-bottom:12px}
+.jira-msg{background:#edf3ff;border:1px solid #b9cdf2;color:#0b3d91;padding:10px 13px;border-radius:7px;margin-bottom:12px}
 
 /* Colores por estado (reutilizados en chips, punto de la columna Estado y leyenda). */
 .chip-produccion,.dot.produccion,.status.produccion i{--sc:#4ca942}
