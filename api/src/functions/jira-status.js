@@ -33,18 +33,24 @@ app.http('jira-status', {
     }
 
     // Lista de issue keys separada por comas: ?keys=PROI-392,PROI-424
+    // Sanitizamos cada key: quitamos espacios internos ("REQI -876" -> "REQI-876")
+    // y pasamos a mayúsculas. Descartamos los que no tengan forma LETRAS-NÚMERO,
+    // porque un solo key malformado hace que Jira rechace toda la JQL (400).
     const raw = request.query.get('keys') || ''
-    const keys = Array.from(
-      new Set(
-        raw
-          .split(',')
-          .map(k => k.trim())
-          .filter(Boolean)
-      )
-    )
+    const debug = request.query.get('debug') === '1'
+    const KEY_RE = /^[A-Z][A-Z0-9]+-\d+$/
+    const cleaned = raw
+      .split(',')
+      .map(k => k.replace(/\s+/g, '').toUpperCase())
+      .filter(Boolean)
+    const keys = Array.from(new Set(cleaned.filter(k => KEY_RE.test(k))))
+    const invalid = Array.from(new Set(cleaned.filter(k => !KEY_RE.test(k))))
 
     if (keys.length === 0) {
-      return json(400, { error: 'Debes enviar al menos un issue key en el parámetro ?keys=' })
+      return json(400, {
+        error: 'No hay issue keys válidos en el parámetro ?keys= (formato esperado: PROI-123).',
+        invalid
+      })
     }
     if (keys.length > MAX_KEYS) {
       return json(400, { error: `Demasiados issue keys (máximo ${MAX_KEYS} por petición).` })
@@ -61,6 +67,8 @@ app.http('jira-status', {
 
     try {
       const statuses = {}
+      const warnings = []       // warningMessages que devuelva Jira (keys ignorados, etc.)
+      let totalIssues = 0       // cuántos issues trajo Jira en total (para debug)
       // El endpoint /search/jql pagina con nextPageToken. Recorremos todas las
       // páginas (para tu volumen basta una, pero así escala sin tocar nada).
       let nextPageToken // undefined en la primera página
@@ -82,12 +90,17 @@ app.http('jira-status', {
           const detail = await safeText(res)
           context.error(`Jira respondió ${res.status}: ${detail}`)
           return json(502, {
-            error: `Jira respondió con error ${res.status}. Revisa las credenciales y la URL base.`
+            error: `Jira respondió con error ${res.status}. Revisa las credenciales y la URL base.`,
+            // Incluimos el detalle de Jira (sin secretos) para poder diagnosticar.
+            jiraStatus: res.status,
+            jiraDetail: safeJson(detail)
           })
         }
 
         const data = await res.json()
+        if (Array.isArray(data.warningMessages)) warnings.push(...data.warningMessages)
         for (const issue of data.issues ?? []) {
+          totalIssues++
           statuses[issue.key] = issue.fields?.status?.name ?? ''
         }
         nextPageToken = data.nextPageToken
@@ -96,7 +109,21 @@ app.http('jira-status', {
       // Qué keys pedidos no volvieron (no existen o sin permiso de lectura).
       const notFound = keys.filter(k => !(k in statuses))
 
-      return json(200, { statuses, notFound })
+      const payload = { statuses, notFound }
+      if (invalid.length) payload.invalid = invalid
+      if (warnings.length) payload.warnings = warnings
+      // Modo diagnóstico: info extra para entender por qué no vuelven estados.
+      if (debug) {
+        payload.debug = {
+          jql,
+          searchUrl,
+          keysEnviados: keys.length,
+          issuesDevueltos: totalIssues,
+          baseUrlConfigurada: baseUrl,
+          emailConfigurado: email // solo el email; el token NUNCA se expone
+        }
+      }
+      return json(200, payload)
     } catch (err) {
       context.error('Error llamando a Jira:', err)
       return json(502, { error: 'No se pudo contactar con Jira. Inténtalo de nuevo más tarde.' })
@@ -117,5 +144,15 @@ async function safeText(res) {
     return (await res.text()).slice(0, 500)
   } catch {
     return '(sin cuerpo)'
+  }
+}
+
+// Intenta parsear un texto como JSON (los errores de Jira vienen en JSON con
+// errorMessages); si no se puede, devuelve el texto tal cual.
+function safeJson(text) {
+  try {
+    return JSON.parse(text)
+  } catch {
+    return text
   }
 }
