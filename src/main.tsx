@@ -96,6 +96,13 @@ function normalize(s: string) {
   return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()
 }
 
+// Normaliza un issue key de Jira para comparar/consultar: quita TODOS los
+// espacios internos ("REQI -876" -> "REQI-876") y pasa a mayúsculas. Debe
+// coincidir con la sanitización que hace el backend (api/jira-status).
+function jiraKey(s: string) {
+  return s.replace(/\s+/g, '').toUpperCase()
+}
+
 function findColumn(headers: string[], aliases: string[]) {
   const normalized = headers.map(normalize)
   const normAliases = aliases.map(normalize)
@@ -572,10 +579,12 @@ function App() {
       // Reúne el issue key relevante por fila: el hijo si existe, si no el padre.
       // Es el mismo criterio con el que luego se rellena la columna Estado Jira,
       // así no consultamos códigos que no vamos a usar.
+      // Normalizamos el código (quita espacios internos y pasa a mayúsculas) para
+      // que "REQI -876" o "proi-392" del Excel hagan match con lo que devuelve Jira.
       const keys = Array.from(
         new Set(
           projects
-            .map(p => (p.childId || p.id).trim())
+            .map(p => jiraKey(p.childId || p.id))
             .filter(Boolean)
         )
       )
@@ -591,6 +600,11 @@ function App() {
       }
 
       const statuses: Record<string, string> = data.statuses ?? {}
+      // Índice normalizado: clave de Jira normalizada -> estado. Así el cruce con
+      // los códigos del Excel no falla por espacios o mayúsculas distintas.
+      const byKey = new Map<string, string>()
+      for (const [k, v] of Object.entries(statuses)) byKey.set(jiraKey(k), v)
+
       // Actualiza la columna "Estado Jira" (statusJira) de cada proyecto.
       // Regla: si la fila tiene código hijo, el estado mostrado es SIEMPRE el del
       // hijo (si Jira no lo devuelve, queda vacío; NO se cae al padre). Si no hay
@@ -598,8 +612,8 @@ function App() {
       let updated = 0
       setProjects(prev =>
         prev.map(p => {
-          const key = p.childId || p.id          // el hijo manda cuando existe
-          const next = statuses[key] ?? ''        // vacío si Jira no lo devolvió
+          const key = jiraKey(p.childId || p.id)  // el hijo manda cuando existe
+          const next = byKey.get(key) ?? ''        // vacío si Jira no lo devolvió
           if (next !== p.statusJira) {
             updated++
             return { ...p, statusJira: next }
