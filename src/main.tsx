@@ -44,6 +44,7 @@ type Project = {
   devTeam: string
   components: string
   direction: string
+  comment: string   // texto de la columna COMENTARIO (vacío si no hay)
   start: Date | null
   end: Date | null
   pap: Date | null
@@ -85,7 +86,8 @@ const HEADER_ALIASES: Record<string, string[]> = {
   pap1: ['pap1', 'pap 1'],
   pap2: ['pap2', 'pap 2'],
   // Encendido: hito puntual posterior al PaP (se muestra como punto verde).
-  encendido: ['encendido', 'encendido produccion', 'go live', 'golive']
+  encendido: ['encendido', 'encendido produccion', 'go live', 'golive'],
+  comment: ['comentario', 'comentarios', 'comment', 'observacion', 'observaciones', 'nota', 'notas']
 }
 
 const MONTH_NAMES: Record<string, number> = {
@@ -323,6 +325,7 @@ function excelToProjects(rows: RawRow[]): Project[] {
         devTeam: optionalText(row, cols.devTeam),
         components: text(row, cols.components, '—'),
         direction: text(row, cols.direction, '—'),
+        comment: optionalText(row, cols.comment),
         start,
         end,
         pap: papDate,
@@ -368,6 +371,7 @@ function sampleProjects(): Project[] {
     return {
       key: id, id, childId: '', name, application, status, statusLabel: STATUS_LABELS[status],
       statusJira: '', stage: STATUS_LABELS[status], responsible, devTeam, components: '—', direction,
+      comment: id === 'PROI-392' ? 'Dependencia con OCP, servicio Document' : '',
       start: dates[0] ?? null, end: dates[dates.length - 1] ?? null,
       pap: pap ? d(pap.split('|')[0]) : null, rollbacks: [], phases
     }
@@ -437,6 +441,8 @@ function App() {
   // Estado de la sincronización con Jira (vía la Azure Function /api/jira-status).
   const [jiraSyncing, setJiraSyncing] = useState(false)
   const [jiraMsg, setJiraMsg] = useState('') // mensaje de resultado de la última sync
+  // Proyecto cuyo comentario se muestra en el modal (null = modal cerrado).
+  const [commentOf, setCommentOf] = useState<Project | null>(null)
   const [monthWidth, setMonthWidth] = useState(200) // px por mes (zoom del timeline)
   const inputRef = useRef<HTMLInputElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -839,7 +845,7 @@ function App() {
             )}
 
             {visibleProjects.length
-              ? visibleProjects.map(p => <RoadmapRow key={p.key} p={p} statusIcon={statusIcon[p.status]} />)
+              ? visibleProjects.map(p => <RoadmapRow key={p.key} p={p} statusIcon={statusIcon[p.status]} onComment={setCommentOf} />)
               : <div className="empty">No hay proyectos que coincidan con los filtros.</div>}
           </div>
         </div>
@@ -861,6 +867,43 @@ function App() {
           <span className="legend-item"><i className="dir-chip dir-tecnologia">Tecnología</i></span>
         </div>
       </main>
+
+      {commentOf && <CommentModal project={commentOf} onClose={() => setCommentOf(null)} />}
+    </div>
+  )
+}
+
+// Modal que muestra el comentario de un proyecto. Se cierra con la X, el botón,
+// clic fuera o la tecla Escape.
+function CommentModal({ project, onClose }: { project: Project; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  return (
+    <div className="modal-overlay" onClick={onClose} role="presentation">
+      <div
+        className="modal"
+        onClick={e => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="comment-modal-title"
+      >
+        <header className="modal-head">
+          <h2 id="comment-modal-title">
+            <span className="modal-warn" aria-hidden="true">!</span>
+            Comentario — {project.id}{project.childId ? ` / ${project.childId}` : ''}
+          </h2>
+          <button className="modal-close" onClick={onClose} aria-label="Cerrar">×</button>
+        </header>
+        <p className="modal-project-name">{project.name}</p>
+        <p className="modal-body">{project.comment}</p>
+        <footer className="modal-foot">
+          <button className="modal-ok" onClick={onClose}>Entendido</button>
+        </footer>
+      </div>
     </div>
   )
 }
@@ -870,7 +913,7 @@ const PHASE_SHORT: Record<PhaseKey, string> = {
   refinamiento: 'Refin.', desarrollo: 'Desarrollo', testing: 'Testing', pap: 'PaP', encendido: 'Encendido'
 }
 
-function RoadmapRow({ p, statusIcon }: { p: Project, statusIcon:string }) {
+function RoadmapRow({ p, statusIcon, onComment }: { p: Project, statusIcon:string, onComment: (p: Project) => void }) {
   const left = p.start ? timelinePosition(p.start) * 100 : 0
   const right = p.end ? timelinePosition(p.end) * 100 : 0
   const width = p.start && p.end ? Math.max(0.6, right - left) : 0
@@ -894,6 +937,17 @@ function RoadmapRow({ p, statusIcon }: { p: Project, statusIcon:string }) {
       <div className="project-ids">
         <b>{p.id}</b>
         {p.childId && <b className="child-id">{p.childId}</b>}
+        {p.comment && (
+          <button
+            type="button"
+            className="comment-flag"
+            onClick={() => onComment(p)}
+            title="Este proyecto tiene un comentario. Clic para verlo."
+            aria-label={`Ver comentario de ${p.id}`}
+          >
+            !
+          </button>
+        )}
       </div>
       <span>{p.name}</span>
       <div className="project-meta">

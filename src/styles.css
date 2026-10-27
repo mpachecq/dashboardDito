@@ -99,6 +99,8 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#1838
 /* Columna Proyecto fija al hacer scroll horizontal, para no perder de vista
    a qué proyecto pertenece cada fila cuando el timeline se desplaza. */
 .header-row>div:first-child{position:sticky;left:0;z-index:6;background:#123675}
+/* Encabezado de Aplicación: fijo también, pegado tras el de Proyecto. */
+.header-row>div:nth-child(2){position:sticky;left:var(--left1);z-index:6;background:#123675}
 .timeline-head{padding:0!important;display:block!important}
 .year{height:27px;text-align:center;padding-top:7px}
 .months{display:grid;grid-template-columns:repeat(var(--months),1fr);height:32px}
@@ -127,6 +129,9 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#1838
 .dir-tecnologia{background:#eaf6ec;color:#2f8a3c}
 .dir-sin{background:#eef0f3;color:#6b7688}
 .app-cell,.status,.status-jira,.responsible,.components,.direction{display:flex;align-items:center;justify-content:center;padding:8px 10px;text-align:center}
+/* La columna Aplicación también queda fija, pegada justo después de Proyecto. */
+.app-cell{position:sticky;left:var(--left1);z-index:7;background:#fff;box-shadow:1px 0 0 #dbe2ec}
+.data-row:nth-child(even) .app-cell{background:#fafcff}
 .responsible,.direction{font-weight:600;color:#2b4874}
 .status-jira{font-size:11px;font-weight:600;color:#5a6b88;white-space:normal;line-height:1.3}
 /* Componentes puede tener textos largos: permitir salto de línea sin cortar. */
@@ -171,7 +176,7 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#1838
 .phase-desarrollo{color:#f4a300}
 .phase-testing{color:#1e6fc5}
 .phase-pap{color:#4ca942}
-.phase-encendido{color:#0a8f3c}
+.phase-encendido{color:#29c5e6}
 
 .status{flex-direction:column;gap:3px}
 .status i{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;color:#fff;font-style:normal;font-weight:900;font-size:12px;background:var(--sc,#c1c7d1)}
@@ -231,3 +236,23 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#1838
 .data-row.row-por-aprobar .components{filter:grayscale(.65);opacity:.5}
 
 /* Los chips de estado hacen wrap solos; sin reglas especiales en móvil. */
+
+/* Botón de aviso de comentario: aparece junto a los códigos de proyecto cuando
+   la fila tiene texto en la columna COMENTARIO. */
+.comment-flag{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;margin-left:6px;border:0;border-radius:50%;background:#f5a623;color:#fff;font-weight:900;font-size:12px;line-height:1;cursor:pointer;box-shadow:0 1px 3px #f5a62355;vertical-align:middle;animation:comment-pulse 2s ease-in-out infinite}
+.comment-flag:hover{background:#e0901a}
+@keyframes comment-pulse{0%,100%{box-shadow:0 0 0 0 #f5a62366}50%{box-shadow:0 0 0 4px #f5a62300}}
+
+/* Modal de comentario */
+.modal-overlay{position:fixed;inset:0;background:#0a1f44aa;display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px}
+.modal{background:#fff;border-radius:12px;max-width:440px;width:100%;box-shadow:0 12px 40px #0a1f4455;overflow:hidden}
+.modal-head{display:flex;align-items:center;gap:10px;padding:16px 18px;border-bottom:1px solid #eef2f8}
+.modal-head h2{margin:0;font-size:16px;color:#173b78;display:flex;align-items:center;gap:8px;flex:1}
+.modal-warn{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:#f5a623;color:#fff;font-weight:900;font-size:14px}
+.modal-close{border:0;background:transparent;font-size:24px;line-height:1;color:#8a97ac;cursor:pointer;padding:0 4px}
+.modal-close:hover{color:#173b78}
+.modal-project-name{margin:14px 18px 4px;font-size:13px;color:#6c7890;font-weight:600}
+.modal-body{margin:4px 18px 18px;font-size:14px;color:#2a3b57;line-height:1.5;white-space:pre-wrap}
+.modal-foot{padding:0 18px 18px;display:flex;justify-content:flex-end}
+.modal-ok{border:0;border-radius:8px;background:#173b78;color:#fff;font-weight:700;padding:9px 18px;cursor:pointer}
+.modal-ok:hover{background:#0f2c5c}
