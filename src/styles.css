@@ -171,6 +171,7 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#1838
 .phase-desarrollo{color:#f4a300}
 .phase-testing{color:#1e6fc5}
 .phase-pap{color:#4ca942}
+.phase-encendido{color:#0a8f3c}
 
 .status{flex-direction:column;gap:3px}
 .status i{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;color:#fff;font-style:normal;font-weight:900;font-size:12px;background:var(--sc,#c1c7d1)}

@@ -19,7 +19,7 @@ type Status =
   | 'cancelado'
   | 'sin-estado'
 
-type PhaseKey = 'refinamiento' | 'desarrollo' | 'testing' | 'pap'
+type PhaseKey = 'refinamiento' | 'desarrollo' | 'testing' | 'pap' | 'encendido'
 
 type Phase = {
   key: PhaseKey
@@ -55,7 +55,8 @@ const PHASE_LABELS: Record<PhaseKey, string> = {
   refinamiento: 'Refinamiento',
   desarrollo: 'Desarrollo',
   testing: 'Testing',
-  pap: 'PaP'
+  pap: 'PaP',
+  encendido: 'Encendido'
 }
 
 const MONTHS = ['Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
@@ -82,7 +83,9 @@ const HEADER_ALIASES: Record<string, string[]> = {
   // PaP oficial = PaP3. PaP1/PaP2 son PaP previos revertidos (rollback).
   pap: ['pap3', 'pap 3'],
   pap1: ['pap1', 'pap 1'],
-  pap2: ['pap2', 'pap 2']
+  pap2: ['pap2', 'pap 2'],
+  // Encendido: hito puntual posterior al PaP (se muestra como punto verde).
+  encendido: ['encendido', 'encendido produccion', 'go live', 'golive']
 }
 
 const MONTH_NAMES: Record<string, number> = {
@@ -260,7 +263,9 @@ function excelToProjects(rows: RawRow[]): Project[] {
         { key: 'desarrollo', range: parseDateCell(cell(row, cols.development)) },
         { key: 'testing', range: parseDateCell(cell(row, cols.testing)) },
         // PaP oficial = PaP3
-        { key: 'pap', range: parseDateCell(cell(row, cols.pap)) }
+        { key: 'pap', range: parseDateCell(cell(row, cols.pap)) },
+        // Encendido: hito puntual (punto verde) posterior al PaP.
+        { key: 'encendido', range: parseDateCell(cell(row, cols.encendido)) }
       ]
 
       // Rollback: PaP3 es el PaP oficial. Cada PaP previo con fecha es un rollback:
@@ -280,8 +285,8 @@ function excelToProjects(rows: RawRow[]): Project[] {
         .map(c => {
           const s = c.range.start ?? c.range.end!
           const e = c.range.end ?? c.range.start!
-          // PaP siempre es una fecha única: se muestra como punto, nunca como rango.
-          if (c.key === 'pap') {
+          // PaP y Encendido son siempre fecha única: se muestran como punto, nunca como rango.
+          if (c.key === 'pap' || c.key === 'encendido') {
             return { key: c.key, label: PHASE_LABELS[c.key], start: s, end: s, isRange: false }
           }
           const [start, end] = s <= e ? [s, e] : [e, s]
@@ -344,19 +349,20 @@ function sampleProjects(): Project[] {
   const phase = (key: PhaseKey, spec: string | null): Phase | null => {
     if (!spec) return null
     const [a, b] = spec.split('|')
-    // PaP siempre es una fecha única (punto), aunque se pase un rango.
-    const s = d(a), e = key === 'pap' ? s : (b ? d(b) : s)
+    // PaP y Encendido son siempre fecha única (punto), aunque se pase un rango.
+    const s = d(a), e = (key === 'pap' || key === 'encendido') ? s : (b ? d(b) : s)
     return { key, label: PHASE_LABELS[key], start: s, end: e, isRange: s.getTime() !== e.getTime() }
   }
   const mk = (
     id: string, name: string, application: string, status: Status, responsible: string, devTeam: string, direction: string,
-    refine: string | null, dev: string | null, test: string | null, pap: string | null
+    refine: string | null, dev: string | null, test: string | null, pap: string | null, enc: string | null = null
   ): Project => {
     const phases = [
       phase('refinamiento', refine),
       phase('desarrollo', dev),
       phase('testing', test),
-      phase('pap', pap)
+      phase('pap', pap),
+      phase('encendido', enc)
     ].filter(Boolean) as Phase[]
     const dates = phases.flatMap(ph => [ph.start, ph.end]).sort((a, b) => a.getTime() - b.getTime())
     return {
@@ -367,8 +373,8 @@ function sampleProjects(): Project[] {
     }
   }
   return [
-    mk('PROI-392', 'Subsanación de huelas Fase 3 - Regeneración de contratos', 'Web', 'testing', 'Diego H.', 'Roberto V.', 'Regulatorio', null, '2026-06-02|2026-06-30', '2026-07-03|2026-07-20', '2026-10-15'),
-    mk('PROI-424', 'Dito - Proceso de subsanación Inconsistencia de Materiales', 'Web', 'testing', 'Diego H.', '', 'Regulatorio', null, '2026-07-06|2026-08-10', '2026-08-21|2026-09-05', '2026-10-15'),
+    mk('PROI-392', 'Subsanación de huelas Fase 3 - Regeneración de contratos', 'Web', 'testing', 'Diego H.', 'Roberto V.', 'Regulatorio', null, '2026-06-02|2026-06-30', '2026-07-03|2026-07-20', '2026-10-15', '2026-10-29'),
+    mk('PROI-424', 'Dito - Proceso de subsanación Inconsistencia de Materiales', 'Web', 'testing', 'Diego H.', '', 'Regulatorio', null, '2026-07-06|2026-08-10', '2026-08-21|2026-09-05', '2026-10-15', '2026-10-22'),
     mk('PROI-703', 'Transformación del Modelo de Apellidos del Contacto', 'App', 'desarrollo', 'Juan Pablo', 'Roberto V / Bryan', 'Regulatorio', '2026-06-20|2026-06-30', '2026-07-01|2026-07-14', '2026-07-15|2026-08-05', '2026-10-08'),
     mk('PROI-511', 'Segmentación B2C única para herramientas - Parte2', 'App', 'testing', 'Miguel Pacheco', '', 'Negocio', null, '2026-07-01|2026-08-31', '2026-09-15|2026-09-21', '2026-09-24'),
     mk('PROI-723', 'Venta de eSIM Retail Dito', 'Web', 'testing', 'Joel T.', 'Roberto V.', 'Negocio', null, '2026-07-01|2026-08-31', '2026-09-15|2026-09-21', '2026-09-24'),
@@ -845,6 +851,7 @@ function App() {
           <span className="legend-item"><i className="seg phase-desarrollo" /> Desarrollo</span>
           <span className="legend-item"><i className="seg phase-testing" /> Testing</span>
           <span className="legend-item"><i className="seg phase-pap" /> PaP</span>
+          <span className="legend-item"><i className="seg phase-encendido" /> Encendido</span>
           <span className="legend-sep" />
           <span className="legend-item"><i className="rb-dot-legend" /> RB = Rollback (PaP revertido)</span>
           <span className="legend-sep" />
@@ -860,7 +867,7 @@ function App() {
 
 // Abreviatura corta de etapa para la etiqueta del segmento.
 const PHASE_SHORT: Record<PhaseKey, string> = {
-  refinamiento: 'Refin.', desarrollo: 'Desarrollo', testing: 'Testing', pap: 'PaP'
+  refinamiento: 'Refin.', desarrollo: 'Desarrollo', testing: 'Testing', pap: 'PaP', encendido: 'Encendido'
 }
 
 function RoadmapRow({ p, statusIcon }: { p: Project, statusIcon:string }) {
@@ -915,7 +922,7 @@ function RoadmapRow({ p, statusIcon }: { p: Project, statusIcon:string }) {
         // Rango: segmento con ancho real. Punto (p.ej. PaP): ancho 0 -> un solo círculo.
         const w = ph.isRange ? Math.max(0.6, ph.x2 - ph.x1) : 0
         return (
-          <div className={`phase phase-${ph.key} lane-${ph.lane} ${ph.isRange ? 'is-range' : 'is-point'}${ph.key === 'pap' ? ' date-right' : ''}`} key={ph.i} style={{left:`${ph.x1}%`, width:`${w}%`}}>
+          <div className={`phase phase-${ph.key} lane-${ph.lane} ${ph.isRange ? 'is-range' : 'is-point'}${(ph.key === 'pap' || ph.key === 'encendido') ? ' date-right' : ''}`} key={ph.i} style={{left:`${ph.x1}%`, width:`${w}%`}}>
             <em className="phase-start">{formatDate(ph.start)}</em>
             <span className="phase-seg" />
             {ph.isRange && <em className="phase-end">{formatDate(ph.end)}</em>}
