@@ -45,6 +45,9 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#1838
 .chip-listo-refinar,.status.listo-refinar i{--sc:#7d8aa0}
 .chip-ean-listo,.status.ean-listo i{--sc:#4a7fa5}
 .chip-definicion,.status.definicion i{--sc:#c1c7d1}
+.chip-validacion-estrategia,.status.validacion-estrategia i{--sc:#5a9bd4}
+.chip-control,.status.control i{--sc:#d98324}
+.chip-idea,.status.idea i{--sc:#e0b93a}
 .chip-cancelado,.dot.cancelado,.status.cancelado i{--sc:#9aa3af}
 .chip-sin-estado,.status.sin-estado i{--sc:#c1c7d1}
 

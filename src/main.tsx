@@ -16,6 +16,9 @@ type Status =
   | 'listo-refinar'
   | 'ean-listo'
   | 'definicion'
+  | 'validacion-estrategia'
+  | 'control'
+  | 'idea'
   | 'cancelado'
   | 'sin-estado'
 
@@ -205,6 +208,9 @@ const STATUS_LABELS: Record<Status, string> = {
   'listo-refinar': 'Listo para refinar',
   'ean-listo': 'EAN Listo',
   definicion: 'Definición',
+  'validacion-estrategia': 'Validación estrategia',
+  control: 'Aprobación control',
+  idea: 'Idea',
   cancelado: 'Cancelado',
   'sin-estado': 'Sin estado'
 }
@@ -216,7 +222,12 @@ function statusFrom(value: unknown): Status {
   if (s.includes('piloto') || s.includes('pilot')) return 'piloto'
   if (s.includes('testing') || s.includes('certificac') || s.includes('qa')) return 'testing'
   if (s.includes('desarrollo')) return 'desarrollo'
+  // "Aprobación control" / "Control" es un estado propio: debe evaluarse ANTES
+  // que "por aprobar", porque contiene la palabra "aprobación".
+  if (s.includes('control')) return 'control'
   if (s.includes('por aprobar') || s.includes('aprobacion') || s.includes('aprobación')) return 'por-aprobar'
+  if (s.includes('validacion') || s.includes('estrategia')) return 'validacion-estrategia'
+  if (s.includes('idea')) return 'idea'
   if (s.includes('listo para refinar') || s.includes('listo refinar')) return 'listo-refinar'
   if (s.includes('ean')) return 'ean-listo'
   if (s.includes('planificado') || s.includes('planeado')) return 'planificado'
@@ -402,8 +413,9 @@ const ALL_DIR = '__all_dir__'
 
 // Orden en que se muestran los chips-filtro de estado (de más avanzado a backlog).
 const STATUS_ORDER: Status[] = [
-  'produccion', 'piloto', 'testing', 'desarrollo', 'por-aprobar',
-  'planificado', 'refinamiento', 'listo-refinar', 'ean-listo', 'definicion', 'cancelado'
+  'produccion', 'piloto', 'testing', 'desarrollo', 'control', 'por-aprobar',
+  'planificado', 'refinamiento', 'listo-refinar', 'ean-listo',
+  'validacion-estrategia', 'definicion', 'idea', 'cancelado', 'sin-estado'
 ]
 
 // Clase CSS corta por estado (para color del chip, punto y fila).
@@ -690,8 +702,8 @@ function App() {
 
   const statusIcon: Record<Status, string> = {
     produccion: '✓', piloto: '✈', testing: '⚑', desarrollo: '▣', 'por-aprobar': '⏸',
-    planificado: '◷', refinamiento: '◔', 'listo-refinar': '◔', 'ean-listo': '◳',
-    definicion: '○', cancelado: '×', 'sin-estado': '—'
+    control: '⚙', planificado: '◷', refinamiento: '◔', 'listo-refinar': '◔', 'ean-listo': '◳',
+    'validacion-estrategia': '◎', definicion: '○', idea: '💡', cancelado: '×', 'sin-estado': '—'
   }
 
   return (
