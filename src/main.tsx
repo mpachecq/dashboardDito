@@ -42,6 +42,7 @@ type Project = {
   status: Status
   statusLabel: string
   statusJira: string
+  papJira: string   // fecha de PaP declarada en Jira (customfield_15056), texto crudo
   stage: string
   responsible: string
   devTeam: string
@@ -331,6 +332,7 @@ function excelToProjects(rows: RawRow[]): Project[] {
         status,
         statusLabel: statusRaw || STATUS_LABELS[status],
         statusJira: optionalText(row, cols.statusJira),
+        papJira: '',
         stage: statusRaw || STATUS_LABELS[status],
         responsible: text(row, cols.responsible, '—'),
         devTeam: optionalText(row, cols.devTeam),
@@ -381,7 +383,7 @@ function sampleProjects(): Project[] {
     const dates = phases.flatMap(ph => [ph.start, ph.end]).sort((a, b) => a.getTime() - b.getTime())
     return {
       key: id, id, childId: '', name, application, status, statusLabel: STATUS_LABELS[status],
-      statusJira: '', stage: STATUS_LABELS[status], responsible, devTeam, components: '—', direction,
+      statusJira: '', papJira: '', stage: STATUS_LABELS[status], responsible, devTeam, components: '—', direction,
       comment: id === 'PROI-392' ? 'Dependencia con OCP, servicio Document' : '',
       start: dates[0] ?? null, end: dates[dates.length - 1] ?? null,
       pap: pap ? d(pap.split('|')[0]) : null, rollbacks: [], phases
@@ -406,6 +408,7 @@ function timelinePosition(date: Date): number {
   return Math.max(0, Math.min(1, pos))
 }
 
+type Tab = 'roadmap' | 'comparacion'
 type SortMode = 'none' | 'pap-asc' | 'pap-desc'
 const ALL_APPS = '__all__'
 const ALL_RESP = '__all_resp__'
@@ -455,6 +458,9 @@ function App() {
   const [jiraMsg, setJiraMsg] = useState('') // mensaje de resultado de la última sync
   // Proyecto cuyo comentario se muestra en el modal (null = modal cerrado).
   const [commentOf, setCommentOf] = useState<Project | null>(null)
+  // Vista activa: el roadmap (Gantt) o la tabla de comparación Excel vs Jira.
+  // Ambas comparten los mismos datos y los mismos botones de Cargar/Sincronizar.
+  const [tab, setTab] = useState<Tab>('roadmap')
   const [monthWidth, setMonthWidth] = useState(200) // px por mes (zoom del timeline)
   const inputRef = useRef<HTMLInputElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -624,27 +630,32 @@ function App() {
       }
 
       const statuses: Record<string, string> = data.statuses ?? {}
-      // Índice normalizado: clave de Jira normalizada -> estado. Así el cruce con
-      // los códigos del Excel no falla por espacios o mayúsculas distintas.
-      const byKey = new Map<string, string>()
-      for (const [k, v] of Object.entries(statuses)) byKey.set(jiraKey(k), v)
+      const papDates: Record<string, string> = data.papDates ?? {}
+      // Índices normalizados: clave de Jira normalizada -> estado / fecha de PaP.
+      // Así el cruce con los códigos del Excel no falla por espacios o mayúsculas.
+      const statusByKey = new Map<string, string>()
+      for (const [k, v] of Object.entries(statuses)) statusByKey.set(jiraKey(k), v)
+      const papByKey = new Map<string, string>()
+      for (const [k, v] of Object.entries(papDates)) papByKey.set(jiraKey(k), v)
 
-      // Actualiza la columna "Estado Jira" (statusJira) de cada proyecto.
-      // Regla: si la fila tiene código hijo, el estado mostrado es SIEMPRE el del
-      // hijo (si Jira no lo devuelve, queda vacío; NO se cae al padre). Si no hay
-      // hijo, se usa el del único código presente (el padre). Vacío si no responde.
+      // Actualiza "Estado Jira" (statusJira) y "PaP Jira" (papJira) de cada proyecto.
+      // Regla: si la fila tiene código hijo, se usa SIEMPRE el del hijo (si Jira no
+      // lo devuelve, queda vacío; NO se cae al padre). Si no hay hijo, se usa el
+      // único código presente (el padre). Vacío si Jira no responde.
+      // Se calcula sobre la lista actual (no dentro del updater de React) para que
+      // el contador de actualizados sea fiable.
       let updated = 0
-      setProjects(prev =>
-        prev.map(p => {
-          const key = jiraKey(p.childId || p.id)  // el hijo manda cuando existe
-          const next = byKey.get(key) ?? ''        // vacío si Jira no lo devolvió
-          if (next !== p.statusJira) {
-            updated++
-            return { ...p, statusJira: next }
-          }
-          return p
-        })
-      )
+      const next = projects.map(p => {
+        const key = jiraKey(p.childId || p.id)  // el hijo manda cuando existe
+        const statusJira = statusByKey.get(key) ?? ''
+        const papJira = papByKey.get(key) ?? ''
+        if (statusJira !== p.statusJira || papJira !== p.papJira) {
+          updated++
+          return { ...p, statusJira, papJira }
+        }
+        return p
+      })
+      setProjects(next)
 
       const notFound: string[] = data.notFound ?? []
       const parts = [`Jira sincronizado: ${updated} proyecto(s) actualizado(s).`]
@@ -722,6 +733,35 @@ function App() {
         <input ref={inputRef} hidden type="file" accept=".xlsx,.xls,.csv" onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])} />
       </header>
 
+      <nav className="tabs" role="tablist" aria-label="Vistas">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'roadmap'}
+          className={`tab${tab === 'roadmap' ? ' active' : ''}`}
+          onClick={() => setTab('roadmap')}
+        >
+          Roadmap
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'comparacion'}
+          className={`tab${tab === 'comparacion' ? ' active' : ''}`}
+          onClick={() => setTab('comparacion')}
+        >
+          Excel vs Jira
+        </button>
+      </nav>
+
+      {error && <div className="error">{error}</div>}
+      {jiraMsg && <div className="jira-msg">{jiraMsg}</div>}
+
+      {tab === 'comparacion' && (
+        <ComparisonView projects={projects} fileName={fileName} updatedAt={updatedAt} />
+      )}
+
+      {tab === 'roadmap' && (<>
       <section className="toolbar">
         <div className="file-pill">
           Datos: <strong>{fileName}</strong>
@@ -785,9 +825,6 @@ function App() {
 
         <div className="count">{visibleProjects.length} de {projects.length}</div>
       </section>
-
-      {error && <div className="error">{error}</div>}
-      {jiraMsg && <div className="jira-msg">{jiraMsg}</div>}
 
       <section className="status-filters">
         <div className="total-chip" title="Total de proyectos">
@@ -879,9 +916,123 @@ function App() {
           <span className="legend-item"><i className="dir-chip dir-tecnologia">Tecnología</i></span>
         </div>
       </main>
+      </>)}
 
       {commentOf && <CommentModal project={commentOf} onClose={() => setCommentOf(null)} />}
     </div>
+  )
+}
+
+// Formatea una fecha con año (dd/mm/aaaa) para la tabla de comparación.
+function formatDateFull(d: Date | null) {
+  return d ? d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : ''
+}
+
+// Formatea la fecha de PaP que viene de Jira (customfield_15056). Normalmente
+// llega como "2026-10-15" (o con hora). Se arma con los componentes del texto,
+// sin pasar por zona horaria, para que no se corra un día. Si el valor no tiene
+// forma de fecha, se muestra tal cual para no ocultar información.
+function formatJiraDate(value: string) {
+  if (!value) return ''
+  const m = value.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (!m) return value
+  return formatDateFull(new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])))
+}
+
+// Vista aparte: compara lo que dice el Excel contra lo que declara Jira.
+// Usa los mismos proyectos que el roadmap; los datos de Jira se llenan con el
+// botón "Sincronizar con Jira" del encabezado.
+function ComparisonView({ projects, fileName, updatedAt }: {
+  projects: Project[]
+  fileName: string
+  updatedAt: Date | null
+}) {
+  const [query, setQuery] = useState('')
+
+  const rows = useMemo(() => {
+    const q = normalize(query.trim())
+    return q
+      ? projects.filter(p => normalize(`${p.id} ${p.childId} ${p.name}`).includes(q))
+      : projects
+  }, [projects, query])
+
+  // Si ningún proyecto tiene fecha de PaP de Jira todavía, falta sincronizar.
+  const synced = projects.some(p => p.papJira)
+
+  return (
+    <section className="cmp">
+      <div className="cmp-bar">
+        <div className="file-pill">
+          Datos: <strong>{fileName}</strong>
+          {updatedAt && (
+            <span className="updated-at">
+              Actualizado al {updatedAt.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+              {' '}{updatedAt.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          )}
+        </div>
+        <label className="control search">
+          <span>Buscar proyecto</span>
+          <div className="search-input">
+            <input
+              type="text"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Código o nombre…"
+            />
+            {query && <button type="button" className="clear" onClick={() => setQuery('')} aria-label="Limpiar búsqueda">×</button>}
+          </div>
+        </label>
+        <div className="count">{rows.length} de {projects.length}</div>
+      </div>
+
+      {!synced && (
+        <div className="cmp-hint">
+          Aún no hay datos de Jira. Presiona <strong>Sincronizar con Jira</strong> para traer el estado y la fecha de PaP.
+        </div>
+      )}
+
+      <div className="cmp-card">
+        <table className="cmp-table">
+          <thead>
+            <tr>
+              <th rowSpan={2} className="cmp-proj">Proyecto</th>
+              <th colSpan={2} className="cmp-group cmp-group-excel">Excel</th>
+              <th colSpan={2} className="cmp-group cmp-group-jira">Jira</th>
+              <th rowSpan={2}>Responsable</th>
+            </tr>
+            <tr>
+              <th className="cmp-sub-excel">Estado</th>
+              <th className="cmp-sub-excel">Fecha PaP</th>
+              <th className="cmp-sub-jira">Estado</th>
+              <th className="cmp-sub-jira">Fecha PaP</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length ? rows.map(p => (
+              <tr key={p.key}>
+                <td className="cmp-proj">
+                  <div className="project-ids">
+                    <b>{p.id}</b>
+                    {p.childId && <b className="child-id">{p.childId}</b>}
+                  </div>
+                  <span className="cmp-name">{p.name}</span>
+                </td>
+                <td>
+                  <span className={`st-pill chip-${p.status}`}><i />{p.statusLabel}</span>
+                </td>
+                <td>{formatDateFull(p.pap) || '—'}</td>
+                <td>{p.statusJira || '—'}</td>
+                <td>{formatJiraDate(p.papJira) || '—'}</td>
+                <td>{p.responsible}</td>
+              </tr>
+            )) : (
+              <tr><td colSpan={6} className="empty">No hay proyectos que coincidan con la búsqueda.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
   )
 }
 

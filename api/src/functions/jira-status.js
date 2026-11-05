@@ -16,6 +16,21 @@ import { app } from '@azure/functions'
 
 const MAX_KEYS = 200 // límite de seguridad por petición
 
+// Campo personalizado de Jira con la fecha de PaP declarada en el issue.
+const PAP_FIELD = 'customfield_15056'
+
+// Convierte el valor de un campo de Jira a texto simple. Un campo de fecha llega
+// como "2026-10-15" (o con hora); si fuera un objeto (select, usuario...) se toma
+// su valor visible. Devuelve '' si el campo está vacío.
+function fieldToText(value) {
+  if (value == null) return ''
+  if (typeof value === 'string' || typeof value === 'number') return String(value)
+  if (typeof value === 'object') {
+    return String(value.value ?? value.name ?? value.displayName ?? '')
+  }
+  return ''
+}
+
 app.http('jira-status', {
   methods: ['GET'],
   authLevel: 'anonymous',
@@ -67,13 +82,14 @@ app.http('jira-status', {
 
     try {
       const statuses = {}
+      const papDates = {}       // key -> fecha de PaP declarada en Jira (customfield_15056)
       const warnings = []       // warningMessages que devuelva Jira (keys ignorados, etc.)
       let totalIssues = 0       // cuántos issues trajo Jira en total (para debug)
       // El endpoint /search/jql pagina con nextPageToken. Recorremos todas las
       // páginas (para tu volumen basta una, pero así escala sin tocar nada).
       let nextPageToken // undefined en la primera página
       do {
-        const body = { jql, fields: ['status'], maxResults: MAX_KEYS }
+        const body = { jql, fields: ['status', PAP_FIELD], maxResults: MAX_KEYS }
         if (nextPageToken) body.nextPageToken = nextPageToken
 
         const res = await fetch(searchUrl, {
@@ -102,6 +118,7 @@ app.http('jira-status', {
         for (const issue of data.issues ?? []) {
           totalIssues++
           statuses[issue.key] = issue.fields?.status?.name ?? ''
+          papDates[issue.key] = fieldToText(issue.fields?.[PAP_FIELD])
         }
         nextPageToken = data.nextPageToken
       } while (nextPageToken)
@@ -109,7 +126,7 @@ app.http('jira-status', {
       // Qué keys pedidos no volvieron (no existen o sin permiso de lectura).
       const notFound = keys.filter(k => !(k in statuses))
 
-      const payload = { statuses, notFound }
+      const payload = { statuses, papDates, notFound }
       if (invalid.length) payload.invalid = invalid
       if (warnings.length) payload.warnings = warnings
       // Modo diagnóstico: info extra para entender por qué no vuelven estados.
