@@ -36,6 +36,7 @@ body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#1838
 
 /* Colores por estado (reutilizados en chips, punto de la columna Estado y leyenda). */
 .chip-produccion,.dot.produccion,.status.produccion i{--sc:#4ca942}
+.chip-listo-pap,.status.listo-pap i{--sc:#1fa59a}
 .chip-piloto,.dot.piloto,.status.piloto i{--sc:#6b4fd1}
 .chip-testing,.dot.testing,.status.testing i{--sc:#1d6fc1}
 .chip-desarrollo,.dot.desarrollo,.status.desarrollo i{--sc:#f5a900}

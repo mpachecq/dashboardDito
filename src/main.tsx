@@ -7,6 +7,7 @@ type RawRow = Record<string, unknown>
 
 type Status =
   | 'produccion'
+  | 'listo-pap'
   | 'piloto'
   | 'testing'
   | 'desarrollo'
@@ -200,6 +201,7 @@ function formatDate(d: Date | null) {
 
 const STATUS_LABELS: Record<Status, string> = {
   produccion: 'Producción',
+  'listo-pap': 'Listo para PaP',
   piloto: 'Piloto',
   testing: 'Testing',
   desarrollo: 'Desarrollo',
@@ -219,6 +221,9 @@ const STATUS_LABELS: Record<Status, string> = {
 function statusFrom(value: unknown): Status {
   const s = normalize(String(value ?? ''))
   if (!s) return 'sin-estado'
+  // "Listo para PaP" es previo a producción: debe evaluarse ANTES de la regla de
+  // Producción, que captura cualquier texto con "pap".
+  if (s.includes('listo') && s.includes('pap')) return 'listo-pap'
   if (s.includes('produccion') || s.includes('entregado') || s.includes('pap')) return 'produccion'
   if (s.includes('piloto') || s.includes('pilot')) return 'piloto'
   if (s.includes('testing') || s.includes('certificac') || s.includes('qa')) return 'testing'
@@ -416,7 +421,7 @@ const ALL_DIR = '__all_dir__'
 
 // Orden en que se muestran los chips-filtro de estado (de más avanzado a backlog).
 const STATUS_ORDER: Status[] = [
-  'produccion', 'piloto', 'testing', 'desarrollo', 'control', 'por-aprobar',
+  'produccion', 'listo-pap', 'piloto', 'testing', 'desarrollo', 'control', 'por-aprobar',
   'planificado', 'refinamiento', 'listo-refinar', 'ean-listo',
   'validacion-estrategia', 'definicion', 'idea', 'cancelado', 'sin-estado'
 ]
@@ -712,7 +717,7 @@ function App() {
   }, [monthWidth, fileName])
 
   const statusIcon: Record<Status, string> = {
-    produccion: '✓', piloto: '✈', testing: '⚑', desarrollo: '▣', 'por-aprobar': '⏸',
+    produccion: '✓', 'listo-pap': '▶', piloto: '✈', testing: '⚑', desarrollo: '▣', 'por-aprobar': '⏸',
     control: '⚙', planificado: '◷', refinamiento: '◔', 'listo-refinar': '◔', 'ean-listo': '◳',
     'validacion-estrategia': '◎', definicion: '○', idea: '💡', cancelado: '×', 'sin-estado': '—'
   }
