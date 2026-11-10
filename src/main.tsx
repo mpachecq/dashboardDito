@@ -8,6 +8,7 @@ type RawRow = Record<string, unknown>
 type Status =
   | 'produccion'
   | 'listo-pap'
+  | 'certificado'
   | 'piloto'
   | 'testing'
   | 'desarrollo'
@@ -202,6 +203,7 @@ function formatDate(d: Date | null) {
 const STATUS_LABELS: Record<Status, string> = {
   produccion: 'Producción',
   'listo-pap': 'Listo para PaP',
+  certificado: 'Certificado',
   piloto: 'Piloto',
   testing: 'Testing',
   desarrollo: 'Desarrollo',
@@ -226,6 +228,9 @@ function statusFrom(value: unknown): Status {
   if (s.includes('listo') && s.includes('pap')) return 'listo-pap'
   if (s.includes('produccion') || s.includes('entregado') || s.includes('pap')) return 'produccion'
   if (s.includes('piloto') || s.includes('pilot')) return 'piloto'
+  // "Certificado" (ya certificado) es un estado propio; "certificación" en curso
+  // sigue contando como Testing.
+  if (s.includes('certificado')) return 'certificado'
   if (s.includes('testing') || s.includes('certificac') || s.includes('qa')) return 'testing'
   if (s.includes('desarrollo')) return 'desarrollo'
   // "Aprobación control" / "Control" es un estado propio: debe evaluarse ANTES
@@ -421,7 +426,7 @@ const ALL_DIR = '__all_dir__'
 
 // Orden en que se muestran los chips-filtro de estado (de más avanzado a backlog).
 const STATUS_ORDER: Status[] = [
-  'produccion', 'listo-pap', 'piloto', 'testing', 'desarrollo', 'control', 'por-aprobar',
+  'produccion', 'listo-pap', 'piloto', 'certificado', 'testing', 'desarrollo', 'control', 'por-aprobar',
   'planificado', 'refinamiento', 'listo-refinar', 'ean-listo',
   'validacion-estrategia', 'definicion', 'idea', 'cancelado', 'sin-estado'
 ]
@@ -717,7 +722,7 @@ function App() {
   }, [monthWidth, fileName])
 
   const statusIcon: Record<Status, string> = {
-    produccion: '✓', 'listo-pap': '▶', piloto: '✈', testing: '⚑', desarrollo: '▣', 'por-aprobar': '⏸',
+    produccion: '✓', 'listo-pap': '▶', certificado: '☑', piloto: '✈', testing: '⚑', desarrollo: '▣', 'por-aprobar': '⏸',
     control: '⚙', planificado: '◷', refinamiento: '◔', 'listo-refinar': '◔', 'ean-listo': '◳',
     'validacion-estrategia': '◎', definicion: '○', idea: '💡', cancelado: '×', 'sin-estado': '—'
   }
